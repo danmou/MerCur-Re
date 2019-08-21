@@ -1,0 +1,3 @@
+[submodule "planet"]
+	path = planet
+	url = https://github.com/google-research/planet.git
