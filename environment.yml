@@ -1,15 +1,49 @@
 name: thesis
+channels:
+    - conda-forge
 dependencies:
   - python=3.6
   - tensorflow=1.13.1
   - numpy=1.16.*
+
+  # test dependencies
   - pytest
   - pytest-runner
   - mypy
+
+  # planet dependencies
+  - matplotlib
+  - ruamel.yaml
+  - scikit-image
+  - scipy
+  - tensorflow-probability=0.6  # (tensorflow_probability)
+
+  # habitat dependencies
+  - attrs
+  - imageio
+  - imageio-ffmpeg
+  - numba
+  - pillow
+  - pyglet
+  - quaternion  # (numpy-quaternion)
+  - requests
+  - tqdm
+  - yacs
+
+  # pip dependencies
   - pip
   - pip:
+    # test
     - pytest-mypy
     - pytest-flake8
-    - gym[box2d]
-    - git+git://github.com/deepmind/dm_control.git  # must be before planet
+
+    # planet
+    - gym[box2d]==0.10.9
+#    - git+git://github.com/deepmind/dm_control.git  # must be before planet
+    - git+git://github.com/Danmou/dm_env.git  # until PR is accepted
+    - git+git://github.com/Danmou/dm_control.git  # until PR is accepted
     - ./planet
+
+    # habitat
+#    - git+git://github.com/facebookresearch/habitat-sim.git  # https://github.com/conda/conda/issues/9144
+    - git+git://github.com/facebookresearch/habitat-api.git
