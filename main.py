@@ -5,14 +5,14 @@
 
 from typing import Optional, List
 
+import habitat
 import tensorflow as tf
-from tensorflow.python.util import deprecation
-
 from planet.scripts.train import main as planet_main
 from planet.tools import AttrDict
+from tensorflow.python.util import deprecation
 
 
-def main(argv: Optional[List[str]] = None) -> None:
+def test_planet() -> None:
     args = AttrDict()
     with args.unlocked:
         args.logdir = '/tmp/planet-logs'
@@ -44,6 +44,25 @@ def main(argv: Optional[List[str]] = None) -> None:
         args.params = params
 
     planet_main(args)
+
+
+def test_habitat() -> None:
+    env = habitat.Env(config=habitat.get_config("configs/habitat/task_pointnav.yaml"))
+
+    print("Environment creation successful")
+    observations = env.reset()
+
+    print("Agent stepping around inside environment.")
+    count_steps = 0
+    while not env.episode_over:
+        observations = env.step(env.action_space.sample())
+        count_steps += 1
+    print("Episode finished after {} steps.".format(count_steps))
+
+
+def main(argv: Optional[List[str]] = None) -> None:
+    # test_planet()
+    test_habitat()
 
 
 if __name__ == '__main__':
