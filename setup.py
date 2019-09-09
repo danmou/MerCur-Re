@@ -6,21 +6,29 @@
 import os
 import subprocess
 import sys
-from setuptools import setup, find_packages
+
+from setuptools import find_packages, setup
 
 requirements = [
+    'click',
+    'gin-config',
+    'gym',
+    'habitat',
+    'loguru',
+    'numpy<1.17',  # 1.17 results in deprecation warnings with TF 1.13
     'planetrl',
-    'numpy<1.17'  # 1.17 results in deprecation warnings with TF 1.13
+    'wandb',
 ]
 
 test_requirements = [
-    'pytest',
-    'pytest-mypy',
     'mypy',
-    'pytest-flake8'
+    'pytest',
+    'pytest-flake8',
+    'pytest-mypy',
 ]
 
-# check if system has CUDA enabled GPU (method borrowed from https://github.com/NervanaSystems/coach/blob/master/setup.py)
+# check if system has CUDA enabled GPU (method borrowed from
+# https://github.com/NervanaSystems/coach/blob/master/setup.py)
 p = subprocess.Popen(['command -v nvidia-smi'], stdout=subprocess.PIPE, shell=True)
 out = p.communicate()[0].decode('UTF-8')
 using_GPU = out != ''

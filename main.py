@@ -1,99 +1,55 @@
 #!/usr/bin/env python
-# main.py
+# main.py: Main entrypoint
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import Optional, List
+import os
+from typing import Optional, Tuple
 
-import habitat
-import numpy as np
-import tensorflow as tf
-from habitat import SimulatorActions
-from planet.scripts.train import main as planet_main
-from planet.tools import AttrDict
+import click
+import gin
+import wandb
+from loguru import logger
 from tensorflow.python.util import deprecation
 
-
-def test_planet() -> None:
-    args = AttrDict()
-    with args.unlocked:
-        args.logdir = '/tmp/planet-logs'
-        args.num_runs = 1000
-        args.ping_every = 0
-        args.resume_runs = False
-        args.config = 'default'
-        params = AttrDict()
-        with params.unlocked:
-            params.tasks = ['cheetah_run']
-            # params.tasks = ['gym_racecar']
-            params.action_repeat = 50
-            params.num_seed_episodes = 1
-            params.train_steps = 10
-            params.test_steps = 10
-            params.max_steps = 500
-            params.train_collects = [dict(after=10, every=10)]
-            params.test_collects = [dict(after=10, every=10)]
-            params.model_size = 10
-            params.state_size = 5
-            params.num_layers = 1
-            params.num_units = 10
-            params.batch_shape = [5, 10]
-            params.loader_every = 5
-            params.loader_window = 2
-            params.planner_amount = 5
-            params.planner_topk = 2
-            params.planner_iterations = 2
-        args.params = params
-
-    planet_main(args)
+from project.logging import init_logging
+from project.planet import run
 
 
-class RandomAgent(habitat.Agent):
-    def __init__(self, success_distance, goal_sensor_uuid):
-        self.dist_threshold_to_stop = success_distance
-        self.goal_sensor_uuid = goal_sensor_uuid
-
-    def reset(self):
-        print('\n*** reset ***\n')
-
-    def is_goal_reached(self, observations):
-        dist = observations[self.goal_sensor_uuid][0]
-        print(f'dist: {dist}')
-        return dist <= self.dist_threshold_to_stop
-
-    def act(self, observations):
-        print(f'got observations {list(observations.keys())}')
-        if self.is_goal_reached(observations):
-            action = SimulatorActions.STOP
-        else:
-            action = np.random.choice(
-                [
-                    SimulatorActions.MOVE_FORWARD,
-                    SimulatorActions.TURN_LEFT,
-                    SimulatorActions.TURN_RIGHT,
-                ]
-            )
-        print(f'action: {action}')
-        return action
-
-def test_habitat() -> None:
-    config = habitat.get_config('configs/habitat/task_pointnav.yaml')
-    agent = RandomAgent(
-        success_distance=config.TASK.SUCCESS_DISTANCE,
-        goal_sensor_uuid=config.TASK.GOAL_SENSOR_UUID,
-    )
-    benchmark = habitat.Benchmark(config_paths='configs/habitat/task_pointnav.yaml')
-    metrics = benchmark.evaluate(agent, num_episodes=10)
-
-    for k, v in metrics.items():
-        habitat.logger.info('{}: {:.3f}'.format(k, v))
+@logger.catch
+@gin.configurable(blacklist=['verbose'])
+def main(verbose: bool, logdir: str) -> None:
+    init_logging(verbose, logdir)
+    run(logdir)
 
 
-def main(argv: Optional[List[str]] = None) -> None:
-    # test_planet()
-    test_habitat()
+@click.command()
+@click.option('-c', '--config', type=click.Path(dir_okay=False), default='configs/default.gin',
+              help='gin config', show_default=True)
+@click.option('-l', '--logdir', type=click.Path(file_okay=False), default=None)
+@click.option('-v', '--verbose', is_flag=True)
+@click.option('-d', '--debug', is_flag=True, help='disable W&B syncing')
+@click.argument('extra_options', nargs=-1)
+def main_command(config: str,
+                 logdir: Optional[str],
+                 verbose: bool,
+                 debug: bool,
+                 extra_options: Tuple[str, ...]
+                 ) -> None:
+    """
+    Run training.
+
+    EXTRA_OPTIONS is one or more additional gin-config options, e.g. 'planet.num_runs=1000'
+    """
+    if logdir:
+        extra_options += (f'main.logdir="{logdir}"',)
+    if debug:
+        os.environ['WANDB_MODE'] = 'dryrun'
+    wandb.init(project="thesis", sync_tensorboard=True)
+    gin.parse_config_files_and_bindings([config], extra_options)
+    main(verbose)
 
 
 if __name__ == '__main__':
     deprecation._PRINT_DEPRECATION_WARNINGS = False
-    tf.app.run()
+    main_command()
