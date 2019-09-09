@@ -24,6 +24,7 @@ test_requirements = [
     'mypy',
     'pytest',
     'pytest-flake8',
+    'pytest-isort',
     'pytest-mypy',
 ]
 
