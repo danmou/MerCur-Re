@@ -20,6 +20,7 @@ from project.planet import run
 @gin.configurable(blacklist=['verbose'])
 def main(verbose: bool, logdir: str) -> None:
     init_logging(verbose, logdir)
+    wandb.config.update({name.rsplit('.', 1)[-1]: conf for (_, name), conf in gin.config._CONFIG.items()})
     run(logdir)
 
 
