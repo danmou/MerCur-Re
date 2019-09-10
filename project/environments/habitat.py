@@ -4,6 +4,7 @@
 
 from typing import Any, Dict, List, Optional, Tuple, TypeVar, cast
 
+import gin
 import gym.spaces
 import habitat
 from habitat.core.simulator import Observations
@@ -11,16 +12,20 @@ from habitat.core.simulator import Observations
 ObsTuple = Tuple[Observations, Any, bool, dict]
 
 
+@gin.configurable(blacklist=['config_path', 'dataset'])
 class Habitat(habitat.RLEnv):
     observation_space: gym.spaces.Dict
     action_space: gym.Space
 
-    def __init__(self, config_path: str, dataset: Optional[habitat.Dataset] = None) -> None:
+    def __init__(self,
+                 config_path: str,
+                 dataset: Optional[habitat.Dataset] = None,
+                 reward_measure: str = 'spl',
+                 image_key: str = 'rgb') -> None:
         config = habitat.get_config(config_path)
         super().__init__(config, dataset)
-        self._reward_measure = 'spl'
-        self._image_key = 'rgb'
-        # TODO: get these from config
+        self._reward_measure = reward_measure
+        self._image_key = image_key
         self.observation_space = gym.spaces.Dict(self._update_key(self.observation_space.spaces))
 
     def get_reward_range(self) -> List[float]:

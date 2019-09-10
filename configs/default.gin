@@ -24,3 +24,6 @@ planet.params = {
     # 'planner_topk': 2,
     # 'planner_iterations': 2,
 }
+
+Habitat.reward_measure = 'spl'
+Habitat.image_key = 'rgb'
