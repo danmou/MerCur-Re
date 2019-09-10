@@ -23,7 +23,7 @@ class Wrapper(PlanetWrapper):
         return cast(Observations, super().reset(**kwargs))
 
 
-@gin.configurable(blacklist=['env'])
+@gin.configurable(whitelist=['sample'])
 class DiscreteWrapper(Wrapper):
     """
     Wraps a discrete action-space environment into a continuous control task.

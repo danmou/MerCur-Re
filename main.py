@@ -17,7 +17,7 @@ from project.planet import run
 
 
 @logger.catch
-@gin.configurable(blacklist=['verbose'])
+@gin.configurable(whitelist=['logdir'])
 def main(verbose: bool, logdir: str) -> None:
     init_logging(verbose, logdir)
     wandb.config.update({name.rsplit('.', 1)[-1]: conf for (_, name), conf in gin.config._CONFIG.items()})

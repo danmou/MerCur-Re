@@ -12,7 +12,7 @@ from habitat.core.simulator import Observations
 ObsTuple = Tuple[Observations, Any, bool, dict]
 
 
-@gin.configurable(blacklist=['config_path', 'dataset'])
+@gin.configurable(whitelist=['reward_measure', 'image_key'])
 class Habitat(habitat.RLEnv):
     observation_space: gym.spaces.Dict
     action_space: gym.Space
