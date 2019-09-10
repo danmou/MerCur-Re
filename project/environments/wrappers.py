@@ -46,27 +46,26 @@ class DiscreteWrapper(Wrapper):
         return cast(ObsTuple, self.env.step(act))
 
 
-class MinimumDurationRepeat(Wrapper):
-    """Extends the episode to a given lower number of decision points by repeating the last observation."""
-    def __init__(self, env: gym.Env, duration: int) -> None:
+class MinimumDuration(Wrapper):
+    """Extends the episode to a given lower number of decision points by preventing stop actions."""
+    def __init__(self, env: gym.Env, duration: int, stop_index: int = 0) -> None:
         super().__init__(env)
         self._duration = duration
+        self._stop_index = stop_index
         self._step = 0
-        self._last_episode: Optional[ObsTuple] = None
 
-    def step(self, action: int) -> ObsTuple:
+    def step(self, action: np.ndarray) -> ObsTuple:
         self._step += 1
-        if self._last_episode is not None:
-            obs, reward, _, info = self._last_episode
-        else:
-            obs, reward, done, info = cast(ObsTuple, self.env.step(action))
-            if done:
-                logger.debug(f'Finished at step {self._step}, repeating for remaining {self._duration - self._step} steps.')
-                self._last_episode = obs, reward, False, info
-        done = self._step >= self._duration
+        if self._step < self._duration:
+            action[self._stop_index] = self.action_space.low[self._stop_index]  # set stop probability to zero
+        obs, reward, done, info = cast(ObsTuple, self.env.step(action))
+        if done:
+            if self._step < self._duration:
+                logger.warning(f'Episode finished at step {self._step}, but requirement is {self._duration}.')
+            else:
+                logger.debug(f'Episode finished at step {self._step}.')
         return obs, reward, done, info
 
     def reset(self, **kwargs: Any) -> Observations:
         self._step = 0
-        self._last_episode = None
         return cast(Observations, self.env.reset(**kwargs))

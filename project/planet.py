@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional
 
 import gin
 import gym
+import habitat
 import planet.control.wrappers as planet_wrappers
 import planet.tools
 import planet.training.running
@@ -44,7 +45,7 @@ def habitat_env_ctor(action_repeat: int, min_length: int, max_length: int) -> gy
     env = Habitat('configs/habitat/task_pointnav.yaml')
     env = planet_wrappers.ActionRepeat(env, action_repeat)
     env = wrappers.DiscreteWrapper(env)
-    env = wrappers.MinimumDurationRepeat(env, min_length)
+    env = wrappers.MinimumDuration(env, min_length, stop_index=habitat.SimulatorActions.STOP)
     env = planet_wrappers.MaximumDuration(env, max_length)
     return env
 
