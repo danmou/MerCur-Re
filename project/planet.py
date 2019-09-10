@@ -42,21 +42,22 @@ def run(logdir: str,
 
 
 def habitat_env_ctor(action_repeat: int, min_length: int, max_length: int) -> gym.Env:
-    env = Habitat('configs/habitat/task_pointnav.yaml')
+    assert min_length <= max_length, f'{min_length}>{max_length}!'
+    logger.debug(f'Collecting episodes between {min_length} and {max_length} steps in length.')
+    env = Habitat('configs/habitat/task_pointnav.yaml', max_steps=max_length*action_repeat)
     env = planet_wrappers.ActionRepeat(env, action_repeat)
     env = wrappers.DiscreteWrapper(env)
     env = wrappers.MinimumDuration(env, min_length, stop_index=habitat.SimulatorActions.STOP)
-    env = planet_wrappers.MaximumDuration(env, max_length)
     return env
 
 
 def planet_habitat_task(config: planet.tools.AttrDict, params: planet.tools.AttrDict) -> PlanetTask:
     action_repeat = params.get('action_repeat', 1)
-    max_length = 500 // action_repeat
+    max_steps = params['max_steps']
     state_components = ['reward', 'goal']
     env_ctor = planet.tools.bind(
-        habitat_env_ctor, action_repeat, config.batch_shape[1], max_length)
-    return PlanetTask('habitat', env_ctor, max_length, state_components)
+        habitat_env_ctor, action_repeat, config.batch_shape[1], max_steps)
+    return PlanetTask('habitat', env_ctor, max_steps, state_components)
 
 
 # Monkey patch PlaNet to add `habitat` task and use loguru instead of print for logging

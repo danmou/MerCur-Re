@@ -20,9 +20,13 @@ class Habitat(habitat.RLEnv):
     def __init__(self,
                  config_path: str,
                  dataset: Optional[habitat.Dataset] = None,
+                 max_steps: Optional[int] = None,
                  reward_measure: str = 'spl',
                  image_key: str = 'rgb') -> None:
-        config = habitat.get_config(config_path)
+        opts = []
+        if max_steps:
+            opts = ['ENVIRONMENT.MAX_EPISODE_STEPS', max_steps]
+        config = habitat.get_config(config_path, opts)
         super().__init__(config, dataset)
         self._reward_measure = reward_measure
         self._image_key = image_key
