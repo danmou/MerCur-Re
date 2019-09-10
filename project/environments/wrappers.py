@@ -4,6 +4,7 @@
 
 from typing import Any, Dict, Optional, Tuple, cast
 
+import gin
 import gym.spaces
 import numpy as np
 from loguru import logger
@@ -22,21 +23,27 @@ class Wrapper(PlanetWrapper):
         return cast(Observations, super().reset(**kwargs))
 
 
+@gin.configurable(blacklist=['env'])
 class DiscreteWrapper(Wrapper):
     """
     Wraps a discrete action-space environment into a continuous control task.
     Inspired by https://github.com/piojanu/planet/blob/master/planet/control/wrappers.py#L731-L747
     """
 
-    def __init__(self, env: gym.Env) -> None:
+    def __init__(self, env: gym.Env, sample: bool = False) -> None:
         super().__init__(env)
-        self.action_space = gym.spaces.Box(low=-1, high=1,
+        self._sample = sample
+        self.action_space = gym.spaces.Box(low=-1, high=1,  # PlaNet returns numbers in this range
                                            shape=(self.env.action_space.n,),
                                            dtype=np.float32)
 
     def step(self, action: np.ndarray) -> ObsTuple:
-        return cast(ObsTuple, self.env.step(np.argmax(action)))
-        # TODO: Maybe sample?
+        if self._sample:
+            action = action + 1  # shift to make values positive
+            act = np.random.choice(len(action), p=action/np.sum(action))
+        else:
+            act = np.argmax(action)
+        return cast(ObsTuple, self.env.step(act))
 
 
 class MinimumDurationRepeat(Wrapper):

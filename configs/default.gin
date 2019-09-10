@@ -25,5 +25,6 @@ planet.params = {
     # 'planner_iterations': 2,
 }
 
+DiscreteWrapper.sample = False
 Habitat.reward_measure = 'spl'
 Habitat.image_key = 'rgb'
