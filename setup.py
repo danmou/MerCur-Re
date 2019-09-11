@@ -12,7 +12,7 @@ from setuptools import find_packages, setup
 requirements = [
     'click',
     'gin-config',
-    'gym',
+    'gym==0.10.9',
     'habitat',
     'loguru',
     'numpy<1.17',  # 1.17 results in deprecation warnings with TF 1.13
@@ -57,5 +57,7 @@ setup(
     extras_require={'test': test_requirements},
     dependency_links=[
         f'file://{os.getcwd()}/planet#egg=planetrl',
+        f'https://github.com/facebookresearch/habitat-api/tarball/master#egg=habitat',
+        f'https://github.com/deepmind/dm_control/tarball/master#egg=dm_control',
     ],
 )
