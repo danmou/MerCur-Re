@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # main.py: Main entrypoint
 #
 # (C) 2019, Daniel Mouritzen
@@ -42,6 +41,7 @@ def main_command(config: str,
 
     EXTRA_OPTIONS is one or more additional gin-config options, e.g. 'planet.num_runs=1000'
     """
+    deprecation._PRINT_DEPRECATION_WARNINGS = False
     if logdir:
         extra_options += (f'main.logdir="{logdir}"',)
     if debug:
@@ -49,8 +49,3 @@ def main_command(config: str,
     wandb.init(project="thesis", sync_tensorboard=True)
     gin.parse_config_files_and_bindings([config], extra_options)
     main(verbose)
-
-
-if __name__ == '__main__':
-    deprecation._PRINT_DEPRECATION_WARNINGS = False
-    main_command()
