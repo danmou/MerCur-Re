@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple, TypeVar, cast
 import gin
 import gym.spaces
 import habitat
+import wandb
 from habitat.core.simulator import Observations
 
 ObsTuple = Tuple[Observations, Any, bool, dict]
@@ -31,6 +32,7 @@ class Habitat(habitat.RLEnv):
         if not dataset_config.endswith('.yaml'):
             dataset_config = f'configs/habitat/datasets/{dataset_config}.yaml'
         config = habitat.get_config([task_config, dataset_config], opts)
+        wandb.config.update({'habitat_config': config})
         super().__init__(config)
         self._reward_measure = reward_measure
         self._image_key = image_key
