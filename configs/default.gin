@@ -10,7 +10,7 @@ planet.params = {
     # 'num_seed_episodes': 1,
     # 'train_steps': 10,
     # 'test_steps': 10,
-    # 'max_steps': 500,
+    'max_steps': 500,
     # 'train_collects': [dict(after=10, every=10)],
     # 'test_collects': [dict(after=10, every=10)],
     # 'model_size': 10,
