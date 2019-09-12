@@ -13,6 +13,7 @@ from tensorflow.python.util import deprecation
 
 from project.logging import init_logging
 from project.planet import run
+from project.util import get_config_dir
 
 
 @logger.catch
@@ -24,7 +25,7 @@ def main(verbose: bool, logdir: str) -> None:
 
 
 @click.command()
-@click.option('-c', '--config', type=click.Path(dir_okay=False), default='configs/default.gin',
+@click.option('-c', '--config', type=click.Path(dir_okay=False), default=f'{get_config_dir()}/default.gin',
               help='gin config', show_default=True)
 @click.option('-l', '--logdir', type=click.Path(file_okay=False), default=None)
 @click.option('-v', '--verbose', is_flag=True)

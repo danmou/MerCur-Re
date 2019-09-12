@@ -10,6 +10,8 @@ import habitat
 import wandb
 from habitat.core.simulator import Observations
 
+from project.util import get_config_dir
+
 ObsTuple = Tuple[Observations, Any, bool, dict]
 
 
@@ -28,9 +30,9 @@ class Habitat(habitat.RLEnv):
         if max_steps:
             opts = ['ENVIRONMENT.MAX_EPISODE_STEPS', max_steps]
         if not task_config.endswith('.yaml'):
-            task_config = f'configs/habitat/tasks/{task_config}.yaml'
+            task_config = f'{get_config_dir()}/habitat/tasks/{task_config}.yaml'
         if not dataset_config.endswith('.yaml'):
-            dataset_config = f'configs/habitat/datasets/{dataset_config}.yaml'
+            dataset_config = f'{get_config_dir()}/habitat/datasets/{dataset_config}.yaml'
         config = habitat.get_config([task_config, dataset_config], opts)
         wandb.config.update({'habitat_config': config})
         super().__init__(config)
