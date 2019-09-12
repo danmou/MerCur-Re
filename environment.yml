@@ -39,9 +39,7 @@ dependencies:
 
     # planet
     - gym[box2d]==0.10.9
-#    - git+git://github.com/deepmind/dm_control.git  # must be before planet
-    - git+git://github.com/Danmou/dm_env.git  # until PR is accepted
-    - git+git://github.com/Danmou/dm_control.git  # until PR is accepted
+    - git+git://github.com/deepmind/dm_control.git  # must be before planet
     - ./planet
 
     # habitat
