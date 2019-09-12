@@ -12,22 +12,26 @@ from habitat.core.simulator import Observations
 ObsTuple = Tuple[Observations, Any, bool, dict]
 
 
-@gin.configurable(whitelist=['reward_measure', 'image_key'])
+@gin.configurable(whitelist=['task_config', 'dataset_config', 'reward_measure', 'image_key'])
 class Habitat(habitat.RLEnv):
     observation_space: gym.spaces.Dict
     action_space: gym.Space
 
     def __init__(self,
-                 config_path: str,
-                 dataset: Optional[habitat.Dataset] = None,
                  max_steps: Optional[int] = None,
+                 task_config: str = 'habitat_test',
+                 dataset_config: str = 'pointnav',
                  reward_measure: str = 'spl',
                  image_key: str = 'rgb') -> None:
         opts = []
         if max_steps:
             opts = ['ENVIRONMENT.MAX_EPISODE_STEPS', max_steps]
-        config = habitat.get_config(config_path, opts)
-        super().__init__(config, dataset)
+        if not task_config.endswith('.yaml'):
+            task_config = f'configs/habitat/tasks/{task_config}.yaml'
+        if not dataset_config.endswith('.yaml'):
+            dataset_config = f'configs/habitat/datasets/{dataset_config}.yaml'
+        config = habitat.get_config([task_config, dataset_config], opts)
+        super().__init__(config)
         self._reward_measure = reward_measure
         self._image_key = image_key
         self.observation_space = gym.spaces.Dict(self._update_key(self.observation_space.spaces))

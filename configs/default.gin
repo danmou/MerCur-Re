@@ -26,5 +26,7 @@ planet.params = {
 }
 
 DiscreteWrapper.sample = False
+Habitat.task_config = 'pointnav'
+Habitat.dataset_config = 'habitat_test'
 Habitat.reward_measure = 'spl'
 Habitat.image_key = 'rgb'

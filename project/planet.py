@@ -44,7 +44,7 @@ def run(logdir: str,
 def habitat_env_ctor(action_repeat: int, min_length: int, max_length: int) -> gym.Env:
     assert min_length <= max_length, f'{min_length}>{max_length}!'
     logger.debug(f'Collecting episodes between {min_length} and {max_length} steps in length.')
-    env = Habitat('configs/habitat/task_pointnav.yaml', max_steps=max_length*action_repeat)
+    env = Habitat(max_steps=max_length*action_repeat)
     env = planet_wrappers.ActionRepeat(env, action_repeat)
     env = wrappers.DiscreteWrapper(env)
     env = wrappers.MinimumDuration(env, min_length, stop_index=habitat.SimulatorActions.STOP)
