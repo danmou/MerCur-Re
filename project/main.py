@@ -3,6 +3,8 @@
 # (C) 2019, Daniel Mouritzen
 
 import os
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Optional, Tuple
 
 import click
@@ -28,11 +30,14 @@ def main(verbose: bool, logdir: str) -> None:
 @click.option('-c', '--config', type=click.Path(dir_okay=False), default=f'{get_config_dir()}/default.gin',
               help='gin config', show_default=True)
 @click.option('-l', '--logdir', type=click.Path(file_okay=False), default=None)
+@click.option('--data', type=click.Path(file_okay=False), default=None,
+              help="path to data directory (containing 'datasets' and 'scene_datasets')")
 @click.option('-v', '--verbose', is_flag=True)
 @click.option('-d', '--debug', is_flag=True, help='disable W&B syncing')
 @click.argument('extra_options', nargs=-1)
 def main_command(config: str,
                  logdir: Optional[str],
+                 data: Optional[str],
                  verbose: bool,
                  debug: bool,
                  extra_options: Tuple[str, ...]
@@ -44,9 +49,19 @@ def main_command(config: str,
     """
     deprecation._PRINT_DEPRECATION_WARNINGS = False
     if logdir:
-        extra_options += (f'main.logdir="{logdir}"',)
+        extra_options += (f'main.logdir="{Path(logdir).absolute()}"',)
     if debug:
         os.environ['WANDB_MODE'] = 'dryrun'
     wandb.init(project="thesis", sync_tensorboard=True)
     gin.parse_config_files_and_bindings([config], extra_options)
-    main(verbose)
+    tempdir = None
+    try:
+        if data:
+            # Habitat assumes data is stored in local 'data' directory
+            tempdir = TemporaryDirectory()
+            (Path(tempdir.name) / 'data').symlink_to(Path(data).absolute())
+            os.chdir(tempdir.name)
+        main(verbose)
+    finally:
+        if tempdir:
+            tempdir.cleanup()
