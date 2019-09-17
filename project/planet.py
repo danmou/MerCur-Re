@@ -2,7 +2,7 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Mapping, Optional
 
 import gin
 import gym
@@ -11,6 +11,7 @@ import planet.control.wrappers as planet_wrappers
 import planet.tools
 import planet.training.running
 import planet.training.utility
+import tensorflow as tf
 from loguru import logger
 from planet.scripts.configs import tasks_lib
 from planet.scripts.tasks import Task as PlanetTask
@@ -60,8 +61,29 @@ def planet_habitat_task(config: planet.tools.AttrDict, params: planet.tools.Attr
     return PlanetTask('habitat', env_ctor, max_steps, state_components)
 
 
+@gin.configurable('planet.tf')
+def create_tf_session(options: Optional[Dict] = None, gpu_options: Optional[Dict] = None) -> tf.Session:
+    if options is None:
+        options = {}
+    if gpu_options is not None:
+        options['gpu_options'] = tf.GPUOptions(**gpu_options)
+    config = tf.ConfigProto(**options)
+    try:
+        return tf.Session('local', config=config)
+    except tf.errors.NotFoundError:
+        return tf.Session(config=config)
+
+
+class PlanetTrainer(planet.training.Trainer):
+    def iterate(self, max_step=None, sess=None):
+        sess = create_tf_session()
+        for score in super().iterate(max_step, sess):
+            yield score
+
+
 # Monkey patch PlaNet to add `habitat` task and use loguru instead of print for logging
 tasks_lib.habitat = planet_habitat_task  # type: ignore
 planet.control.wrappers.print = logger.info  # type: ignore
 planet.training.utility.print = logger.info  # type: ignore
 planet.training.running.print = logger.info  # type: ignore
+planet.training.trainer.Trainer = PlanetTrainer  # type: ignore

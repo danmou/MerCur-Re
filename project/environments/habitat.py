@@ -15,7 +15,7 @@ from project.util import get_config_dir
 ObsTuple = Tuple[Observations, Any, bool, dict]
 
 
-@gin.configurable(whitelist=['task', 'dataset', 'reward_measure', 'image_key'])
+@gin.configurable(whitelist=['task', 'dataset', 'reward_measure', 'image_key', 'gpu_id'])
 class Habitat(habitat.RLEnv):
     observation_space: gym.spaces.Dict
     action_space: gym.Space
@@ -25,10 +25,11 @@ class Habitat(habitat.RLEnv):
                  task: str = 'habitat_test',
                  dataset: str = 'pointnav',
                  reward_measure: str = 'spl',
-                 image_key: str = 'rgb') -> None:
-        opts = []
+                 image_key: str = 'rgb',
+                 gpu_id: int = 0) -> None:
+        opts = ['SIMULATOR.HABITAT_SIM_V0.GPU_DEVICE_ID', gpu_id]
         if max_steps:
-            opts = ['ENVIRONMENT.MAX_EPISODE_STEPS', max_steps]
+            opts += ['ENVIRONMENT.MAX_EPISODE_STEPS', max_steps]
         if not task.endswith('.yaml'):
             task = f'{get_config_dir()}/habitat/tasks/{task}.yaml'
         if not dataset.endswith('.yaml'):
