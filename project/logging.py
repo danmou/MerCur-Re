@@ -6,7 +6,9 @@ import inspect
 import logging
 import sys
 from pathlib import Path
+from typing import List, Optional
 
+import gin
 import tensorflow as tf
 from loguru import logger
 from tensorflow.python import logging as tf_logging
@@ -19,11 +21,18 @@ tf.contrib._warning = None
 logger.remove()
 
 
+@gin.configurable('logging', whitelist=['mute'])
 class InterceptHandler(logging.Handler):
     """
     Handler to force stdlib logging to go through loguru
     Based on https://github.com/Delgan/loguru/issues/78
     """
+    def __init__(self, level: int = logging.NOTSET, mute: Optional[List[str]] = None):
+        super().__init__(level)
+        self._mute = [] if mute is None else mute
+        for mod in self._mute:
+            logging.getLogger(mod).setLevel(logging.WARNING)
+
     def emit(self, record: logging.LogRecord) -> None:
         # Retrieve context where the logging call occurred
         depth = next(i for i, f in enumerate(inspect.stack()[1:])

@@ -1,4 +1,5 @@
 main.logdir = 'logs'
+logging.mute = ['matplotlib', 'PIL']
 
 planet.num_runs = 1000
 planet.ping_every = 0
