@@ -17,6 +17,7 @@ dependencies:
   - scikit-image
   - scipy
   - tensorflow-probability=0.6  # (tensorflow_probability)
+  - ffmpeg  # needed to create gifs
 
   # habitat dependencies
   - attrs
