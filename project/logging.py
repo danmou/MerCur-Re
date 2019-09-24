@@ -6,7 +6,7 @@ import inspect
 import logging
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import gin
 import tensorflow as tf
@@ -39,10 +39,13 @@ class InterceptHandler(logging.Handler):
                      if f.filename not in [logging.__file__, tf_logging.__file__]
                      ) + 1
         logger_opt = logger.opt(depth=depth, exception=record.exc_info)
-        logger_opt.log(record.levelname, record.getMessage())
+        for line in record.getMessage().split('\n'):
+            level = record.levelname
+            level_: Union[str, int] = int(level[6:]) if level.startswith('Level ') else level
+            logger_opt.log(level_, line.rstrip())
 
 
-def init_logging(verbose: bool, logdir: str) -> None:
+def init_logging(verbose: bool, logdir: Union[str, Path]) -> None:
     # Disable TF's default logging handler
     logging.getLogger('tensorflow').handlers = []
 

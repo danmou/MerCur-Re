@@ -11,7 +11,7 @@ import wandb
 from habitat.core.simulator import Observations
 from loguru import logger
 
-from project.util import get_config_dir
+from project.util import capture_output, get_config_dir
 
 ObsTuple = Tuple[Observations, Any, bool, dict]
 
@@ -82,7 +82,8 @@ class Habitat:
             logger.debug("Deleting current instance of Habitat before reinit.")
             self.close()
         logger.debug("Creating Habitat instance.")
-        Habitat.__instance = Habitat.__Habitat(self.config, self.reward_measure, self.image_key)
+        with capture_output('habitat_sim'):
+            Habitat.__instance = Habitat.__Habitat(self.config, self.reward_measure, self.image_key)
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self.__instance, name)
@@ -95,7 +96,8 @@ class Habitat:
 
     def close(self) -> None:
         assert self.__instance is not None
-        self.__instance.close()
+        with capture_output('habitat_sim'):
+            self.__instance.close()
 
 
 def get_config(max_steps: Optional[Union[int, float]],

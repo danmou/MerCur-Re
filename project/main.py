@@ -3,9 +3,10 @@
 # (C) 2019, Daniel Mouritzen
 
 import os
+import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import click
 import gin
@@ -18,12 +19,17 @@ from project.planet import run
 from project.util import get_config_dir
 
 
-@logger.catch
 @gin.configurable(whitelist=['logdir'])
-def main(verbose: bool, logdir: str) -> None:
+def main(verbose: bool, logdir: Union[str, Path]) -> None:
+    logdir = Path(logdir)
+    if logdir.exists() and len(list(logdir.iterdir())):
+        if click.confirm(f"Logdir '{logdir}' exists and is not empty. Clear it?"):
+            shutil.rmtree(logdir)
+            logdir.mkdir()
     init_logging(verbose, logdir)
     wandb.config.update({name.rsplit('.', 1)[-1]: conf for (_, name), conf in gin.config._CONFIG.items()})
-    run(logdir)
+    with logger.catch():
+        run(str(logdir))
 
 
 @click.command()
@@ -49,11 +55,13 @@ def main_command(config: str,
     """
     deprecation._PRINT_DEPRECATION_WARNINGS = False
     if logdir:
-        extra_options += (f'main.logdir="{Path(logdir).absolute()}"',)
+        extra_options += (f'main.logdir="{logdir}"',)
     if debug:
         os.environ['WANDB_MODE'] = 'dryrun'
     wandb.init(project="thesis", sync_tensorboard=True)
     gin.parse_config_files_and_bindings([config], extra_options)
+    with gin.unlock_config():
+        gin.bind_parameter('main.logdir', str(Path(gin.query_parameter('main.logdir')).absolute()))
     tempdir = None
     try:
         if data:
