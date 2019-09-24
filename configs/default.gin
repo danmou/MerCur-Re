@@ -1,7 +1,7 @@
 main.logdir = 'logs'
 logging.mute = ['matplotlib', 'PIL']
 
-planet.num_runs = 1000
+planet.num_runs = 1
 planet.ping_every = 0
 planet.resume_runs = False
 planet.config = 'default'
@@ -10,17 +10,18 @@ planet.params = {
     'isolate_envs': 'none',  # Don't change
     # 'action_repeat': 1,
     # 'num_seed_episodes': 1,
-    # 'train_steps': 10,
-    # 'test_steps': 10,
+    'train_steps': 5e3,
+    # 'train_steps': 5e1,
+    # 'test_steps': 50,
     'max_steps': 5e7,  # Maximum number of training steps
     'max_task_length': 500,  # Maximum sequence length
-    # 'train_collects': [dict(after=10, every=10)],
-    # 'test_collects': [dict(after=10, every=10)],
+    # 'train_collects': [{'after': 10, 'every': 10}],
+    # 'test_collects': [{'after': 10, 'every': 10}],
     # 'model_size': 10,
     # 'state_size': 5,
     # 'num_layers': 1,
     # 'num_units': 10,
-    # 'batch_shape': [5, 10],
+    # 'batch_shape': [2, 5],  # [batch_size, min_seq_length]
     # 'loader_every': 5,
     # 'loader_window': 2,
     # 'planner_amount': 5,
@@ -28,7 +29,7 @@ planet.params = {
     # 'planner_iterations': 2,
 }
 planet.tf.options = {
-    'log_device_placement': True,
+    'log_device_placement': False,
     # 'device_count': {'GPU': 0, 'CPU': 4},
     'inter_op_parallelism_threads': 1,  # Don't change
 }
@@ -37,6 +38,7 @@ planet.tf.gpu_options = {
     'visible_device_list': '1',
     # 'per_process_gpu_memory_fraction': 0.5,
 }
+planet.tf.debugger = False
 
 DiscreteWrapper.sample = False
 Habitat.task = 'pointnav'
