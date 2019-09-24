@@ -3,6 +3,10 @@
 #
 # (C) 2019, Daniel Mouritzen
 
+import sys
+
+sys.path.append('planet')
+
 from project.main import main_command
 
 if __name__ == '__main__':
