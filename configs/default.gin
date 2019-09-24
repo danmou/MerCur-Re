@@ -7,11 +7,13 @@ planet.resume_runs = False
 planet.config = 'default'
 planet.params = {
     'tasks': ['habitat'],
+    'isolate_envs': 'none',  # Don't change
     # 'action_repeat': 1,
     # 'num_seed_episodes': 1,
     # 'train_steps': 10,
     # 'test_steps': 10,
-    'max_steps': 500,
+    'max_steps': 5e7,  # Maximum number of training steps
+    'max_task_length': 500,  # Maximum sequence length
     # 'train_collects': [dict(after=10, every=10)],
     # 'test_collects': [dict(after=10, every=10)],
     # 'model_size': 10,
@@ -28,6 +30,7 @@ planet.params = {
 planet.tf.options = {
     'log_device_placement': True,
     # 'device_count': {'GPU': 0, 'CPU': 4},
+    'inter_op_parallelism_threads': 1,  # Don't change
 }
 planet.tf.gpu_options = {
     'allow_growth': True,
