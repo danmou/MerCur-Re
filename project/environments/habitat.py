@@ -16,37 +16,76 @@ from project.util import capture_output, get_config_dir
 ObsTuple = Tuple[Observations, Any, bool, dict]
 
 
-@gin.configurable(whitelist=['task', 'dataset', 'gpu_id', 'reward_measure', 'image_key'])
+@gin.configurable(whitelist=['task', 'dataset', 'gpu_id', 'image_key', 'slack_reward', 'success_reward'])
 class Habitat:
+    """
+    Singleton wrapper for Habitat.
+
+    Reward function is based on
+    github.com/facebookresearch/habitat-api/blob/master/habitat_baselines/common/environments.py
+    """
     class __Habitat(habitat.RLEnv):
         observation_space: gym.spaces.Dict
         action_space: gym.Space
 
-        def __init__(self, config: habitat.Config, reward_measure: str = 'spl', image_key: str = 'rgb') -> None:
-            super().__init__(config)
-            self._reward_measure = reward_measure
+        def __init__(self, config: habitat.Config, image_key: str, slack_reward: float, success_reward: float) -> None:
             self._image_key = image_key
+            self._slack_reward = slack_reward
+            self._success_reward = success_reward
+            self._success_distance = config.TASK.SUCCESS_DISTANCE
+            self._previous_target_distance = None
+            self._previous_action = None
+
+            super().__init__(config)
             self.observation_space = gym.spaces.Dict(self._update_key(self.observation_space.spaces))
 
         def get_reward_range(self) -> List[float]:
-            return [0.0, 1.0]
+            return [
+                self._slack_reward - 1.0,
+                self._success_reward + 1.0,
+            ]
 
         def get_reward(self, observations: Observations) -> float:
-            return cast(float, self.habitat_env.get_metrics()[self._reward_measure])
+            reward = self._slack_reward
+
+            current_target_distance = self._distance_target()
+            reward += self._previous_target_distance - current_target_distance
+            self._previous_target_distance = current_target_distance
+
+            if self._episode_success():
+                reward += self._success_reward
+
+            return reward
+
+        def _distance_target(self) -> float:
+            current_position = self._env.sim.get_agent_state().position.tolist()
+            target_position = self._env.current_episode.goals[0].position
+            distance = self._env.sim.geodesic_distance(
+                current_position, target_position
+            )
+            return distance
 
         def get_done(self, observations: Observations) -> bool:
-            return self.habitat_env.episode_over
+            return self._env.episode_over or self._episode_success()
+
+        def _episode_success(self) -> bool:
+            return self._previous_action == habitat.SimulatorActions.STOP and \
+                   self._distance_target() < self._success_distance
 
         def get_info(self, observations: Observations) -> Dict[Any, Any]:
             return self.habitat_env.get_metrics()
 
         def step(self, action: int) -> ObsTuple:
+            self._previous_action = action
             obs, reward, done, info = super().step(action)
             obs = self._update_key(obs)
             return obs, reward, done, info
 
         def reset(self) -> Observations:
-            return self._update_key(super().reset())
+            self._previous_action = None
+            observations = super().reset()
+            self._previous_target_distance = self.habitat_env.current_episode.info["geodesic_distance"]
+            return self._update_key(observations)
 
         _ObsOrDict = TypeVar('_ObsOrDict', Observations, Dict['str', Any])
 
@@ -65,17 +104,16 @@ class Habitat:
                  task: str = 'habitat_test',
                  dataset: str = 'pointnav',
                  gpu_id: int = 0,
-                 reward_measure: str = 'spl',
-                 image_key: str = 'rgb') -> None:
+                 image_key: str = 'rgb',
+                 slack_reward: float = -0.01,
+                 success_reward: float = 10.0) -> None:
         self.config = get_config(max_steps, task, dataset, gpu_id)
-        self.reward_measure = reward_measure
         self.image_key = image_key
+        self.slack_reward = slack_reward
+        self.success_reward = success_reward
         self.__create_instance()
 
     def __create_instance(self) -> None:
-        assert self.config is not None
-        assert self.reward_measure is not None
-        assert self.image_key is not None
         if not Habitat.__instance:
             wandb.config.update({'habitat_config': self.config})
         else:
@@ -83,7 +121,7 @@ class Habitat:
             self.close()
         logger.debug("Creating Habitat instance.")
         with capture_output('habitat_sim'):
-            Habitat.__instance = Habitat.__Habitat(self.config, self.reward_measure, self.image_key)
+            Habitat.__instance = Habitat.__Habitat(self.config, self.image_key, self.slack_reward, self.success_reward)
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self.__instance, name)
