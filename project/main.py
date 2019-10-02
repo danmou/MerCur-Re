@@ -2,8 +2,8 @@
 #
 # (C) 2019, Daniel Mouritzen
 
+import datetime
 import os
-import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Optional, Tuple, Union
@@ -21,11 +21,8 @@ from project.util import get_config_dir
 
 @gin.configurable(whitelist=['logdir'])
 def main(verbose: bool, logdir: Union[str, Path]) -> None:
-    logdir = Path(logdir)
-    if logdir.exists() and len(list(logdir.iterdir())):
-        if click.confirm(f"Logdir '{logdir}' exists and is not empty. Clear it?"):
-            shutil.rmtree(logdir)
-            logdir.mkdir()
+    logdir = Path(logdir) / datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    logdir.mkdir(parents=True)
     init_logging(verbose, logdir)
     wandb.config.update({name.rsplit('.', 1)[-1]: conf for (_, name), conf in gin.config._CONFIG.items()})
     with logger.catch():
