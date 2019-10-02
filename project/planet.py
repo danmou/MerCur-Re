@@ -94,7 +94,22 @@ def create_tf_session(debugger: bool = False) -> tf.Session:
     options = PlanetTFOptions()
     gpu_options = PlanetTFGPUOptions()
     if gpu_options:
-        options.gpu_options = tf.GPUOptions(**gpu_options)
+        devices = [int(d) for d in gpu_options.get('visible_device_list', '').split(',')]
+        if devices:
+            num_visible_devices = len(os.environ.get('CUDA_VISIBLE_DEVICES', '').split(','))
+            max_d = max(devices)
+            min_d = min(devices)
+            assert max_d - min_d < num_visible_devices, (f'Config specifies devices {devices} for planet, but only '
+                                                         f'{num_visible_devices} devices are visible to CUDA.')
+            if max_d >= num_visible_devices:
+                shift = max_d - num_visible_devices + 1
+                logger.warning(f'Config specifies devices {devices} for planet, but only {num_visible_devices} devices '
+                               f'are visible to CUDA. Shifting device list down by {shift} to compensate.')
+                devices = [d - shift for d in devices]
+                with gpu_options.unlocked:
+                    gpu_options.visible_device_list = ','.join([str(d) for d in devices])
+        with options.unlocked:
+            options.gpu_options = tf.GPUOptions(**gpu_options)
     config = tf.ConfigProto(**options)
     with capture_output('tensorflow'):
         try:

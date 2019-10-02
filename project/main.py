@@ -40,12 +40,14 @@ def main(verbose: bool, logdir: Union[str, Path]) -> None:
               help="path to data directory (containing 'datasets' and 'scene_datasets')")
 @click.option('-v', '--verbose', is_flag=True)
 @click.option('-d', '--debug', is_flag=True, help='disable W&B syncing')
+@click.option('--gpus', default=None)
 @click.argument('extra_options', nargs=-1)
 def main_command(config: str,
                  logdir: Optional[str],
                  data: Optional[str],
                  verbose: bool,
                  debug: bool,
+                 gpus: Optional[str],
                  extra_options: Tuple[str, ...]
                  ) -> None:
     """
@@ -58,6 +60,11 @@ def main_command(config: str,
         extra_options += (f'main.logdir="{logdir}"',)
     if debug:
         os.environ['WANDB_MODE'] = 'dryrun'
+    if gpus is None and 'CUDA_VISIBLE_DEVICES' not in os.environ:
+        print(f'Warning: No GPU devices specified. Defaulting to device 0.')
+        os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+    if gpus is not None:
+        os.environ['CUDA_VISIBLE_DEVICES'] = gpus
     wandb.init(project="thesis", sync_tensorboard=True)
     gin.parse_config_files_and_bindings([config], extra_options)
     with gin.unlock_config():
