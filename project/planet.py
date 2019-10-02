@@ -24,16 +24,21 @@ from .environments import Habitat, wrappers
 from .util import capture_output
 
 
+@gin.configurable('planet.params')
+class PlanetParams(planet.tools.AttrDict):
+    pass
+
+
 @gin.configurable('planet')
 def run(logdir: str,
         num_runs: int = 1000,
         ping_every: int = 0,
         resume_runs: bool = False,
         config: str = 'default',
-        params: Optional[Dict[str, Any]] = None,
         ) -> None:
-    if params is None:
-        params = {'tasks': ['habitat']}
+    params = PlanetParams()
+    if not params.get('tasks'):
+        params.tasks = ['habitat']
     args = planet.tools.AttrDict()
     with args.unlocked:
         args.logdir = logdir
@@ -41,7 +46,7 @@ def run(logdir: str,
         args.ping_every = ping_every
         args.resume_runs = resume_runs
         args.config = config
-        args.params = planet.tools.AttrDict(params)
+        args.params = params
 
     # From planet.scripts.train.main
     experiment = planet.training.Experiment(
@@ -74,14 +79,22 @@ def planet_habitat_task(config: planet.tools.AttrDict, params: planet.tools.Attr
     return PlanetTask('habitat', env_ctor, max_length, state_components)
 
 
+@gin.configurable('planet.tf.options')
+class PlanetTFOptions(planet.tools.AttrDict):
+    pass
+
+
+@gin.configurable('planet.tf.gpu_options')
+class PlanetTFGPUOptions(planet.tools.AttrDict):
+    pass
+
+
 @gin.configurable('planet.tf')
-def create_tf_session(options: Optional[Dict] = None,
-                      gpu_options: Optional[Dict] = None,
-                      debugger: bool = False) -> tf.Session:
-    if options is None:
-        options = {}
-    if gpu_options is not None:
-        options['gpu_options'] = tf.GPUOptions(**gpu_options)
+def create_tf_session(debugger: bool = False) -> tf.Session:
+    options = PlanetTFOptions()
+    gpu_options = PlanetTFGPUOptions()
+    if gpu_options:
+        options.gpu_options = tf.GPUOptions(**gpu_options)
     config = tf.ConfigProto(**options)
     with capture_output('tensorflow'):
         try:
