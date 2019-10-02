@@ -30,8 +30,7 @@ def main(verbose: bool, logdir: Union[str, Path]) -> None:
 
 
 @click.command()
-@click.option('-c', '--config', type=click.Path(dir_okay=False), default=f'{get_config_dir()}/default.gin',
-              help='gin config', show_default=True)
+@click.option('-c', '--config', type=click.Path(dir_okay=False), default=None, help='gin config')
 @click.option('-l', '--logdir', type=click.Path(file_okay=False), default=None)
 @click.option('--data', type=click.Path(file_okay=False), default=None,
               help="path to data directory (containing 'datasets' and 'scene_datasets')")
@@ -57,6 +56,10 @@ def main_command(config: str,
         extra_options += (f'main.logdir="{logdir}"',)
     if debug:
         os.environ['WANDB_MODE'] = 'dryrun'
+    if config is None:
+        config = f'{get_config_dir()}/{"debug" if debug else "default"}.gin'
+        if verbose:
+            print(f'Using config {config}.')  # use print because logging has not yet been initialized
     if gpus is None and 'CUDA_VISIBLE_DEVICES' not in os.environ:
         print(f'Warning: No GPU devices specified. Defaulting to device 0.')
         os.environ['CUDA_VISIBLE_DEVICES'] = '0'

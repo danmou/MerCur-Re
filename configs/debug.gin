@@ -1,0 +1,28 @@
+include 'configs/default.gin'
+
+main.logdir = 'debug_logs'
+
+planet.params.action_repeat = 5
+planet.params.num_seed_episodes = 1
+planet.params.train_steps = 10
+planet.params.test_steps = 10
+planet.params.max_steps = 40  # Maximum number of training steps
+planet.params.max_task_length = 10  # Maximum sequence length
+planet.params.collect_every = 10
+planet.params.model_size = 10
+planet.params.state_size = 5
+planet.params.num_layers = 1
+planet.params.num_units = 10
+planet.params.batch_shape = [2, 5]  # [batch_size, min_seq_length]
+planet.params.loader_every = 5
+planet.params.loader_window = 2
+planet.params.planner_amount = 5
+planet.params.planner_topk = 2
+planet.params.planner_iterations = 2
+
+# planet.tf.options.log_device_placement = True
+planet.tf.gpu_options.visible_device_list = '0'
+# planet.tf.debugger = True
+
+Habitat.dataset = 'habitat_test'
+Habitat.gpu_id = 0

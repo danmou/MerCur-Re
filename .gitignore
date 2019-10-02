@@ -217,5 +217,6 @@ dmypy.json
 # End of https://www.gitignore.io/api/python,pycharm+all
 
 data
+debug_logs/
 logs/
 wandb/
