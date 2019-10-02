@@ -1,0 +1,8 @@
+program: run.py
+method: grid
+#metric:
+#  name: val_loss
+#  goal: minimize
+parameters:
+  planet.params.max_task_length:
+    values: [5, 10, 15, 20, 30, 50]
