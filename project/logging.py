@@ -45,7 +45,7 @@ class InterceptHandler(logging.Handler):
             logger_opt.log(level_, line.rstrip())
 
 
-def init_logging(verbose: bool, logdir: Union[str, Path]) -> None:
+def init_logging(verbosity: str, logdir: Union[str, Path]) -> None:
     # Disable TF's default logging handler
     logging.getLogger('tensorflow').handlers = []
 
@@ -55,7 +55,7 @@ def init_logging(verbose: bool, logdir: Union[str, Path]) -> None:
     # Log to stdout and logfile
     logger.add(sys.stdout,
                format='<level>[{level[0]}] {time:HH:mm:ss}</level> {message}',
-               level='DEBUG' if verbose else 'INFO',
+               level=verbosity,
                backtrace=True,
                diagnose=True)
     logfile = Path(logdir) / 'output.log'
