@@ -7,6 +7,7 @@ import os
 import sys
 import time
 from multiprocessing import Process
+from typing import Dict
 
 import click
 import wandb
@@ -37,7 +38,7 @@ def main(sweep_config: str, base_config: str, gpus: str, verbosity: str) -> None
     with open(sweep_config) as conf:
         config_dict = yaml.load(conf, Loader=yaml.FullLoader)
     sweep_id = wandb.sweep(config_dict)
-    processes = {}
+    processes: Dict[str, Process] = {}
     try:
         for gpu in gpus.split(','):
             assert gpu not in processes.keys(), f'GPU {gpu} was specified twice!'

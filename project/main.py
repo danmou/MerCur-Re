@@ -28,7 +28,9 @@ def main(verbosity: str, logdir: Union[str, Path], name: Optional[str] = None) -
     logdir = Path(logdir) / logdir_name
     logdir.mkdir(parents=True)
     init_logging(verbosity, logdir)
-    wandb.config.update({name.rsplit('.', 1)[-1]: conf for (_, name), conf in gin.config._CONFIG.items()})
+    wandb.config.update({name.rsplit('.', 1)[-1]: conf
+                         for (_, name), conf in gin.config._CONFIG.items()
+                         if name is not None})
     with logger.catch():
         run(str(logdir))
 
@@ -65,7 +67,7 @@ def main_configure(config: str,
               help="path to data directory (containing 'datasets' and 'scene_datasets')")
 @click.option('-v', '--verbose', is_flag=True)
 @click.option('--verbosity', default='INFO')
-@click.option('-d', '--debug', is_flag=True, help='disable W&B syncing')
+@click.option('-d', '--debug', is_flag=True, help='disable W&B syncing and enable debug config')
 @click.option('--gpus', default=None)
 @click.option('-n', '--name', default=None)
 @click.argument('extra_options', nargs=-1)

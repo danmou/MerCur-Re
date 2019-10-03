@@ -97,6 +97,13 @@ class Habitat:
             obs.update(obs_dict)
             return obs
 
+        def close(self) -> None:
+            with capture_output('habitat_sim'):
+                self._env.close()
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(self._env, name)
+
     __instance = None
 
     def __init__(self,
@@ -131,11 +138,6 @@ class Habitat:
         assert self.__instance is not None
         obs = self.__instance.reset()
         return obs
-
-    def close(self) -> None:
-        assert self.__instance is not None
-        with capture_output('habitat_sim'):
-            self.__instance.close()
 
 
 def get_config(max_steps: Optional[Union[int, float]],

@@ -4,7 +4,7 @@
 
 import functools
 import os.path
-from typing import Any, Dict, Generator, List, Optional, cast
+from typing import Any, Dict, Generator, List, cast
 
 import gin
 import gym
