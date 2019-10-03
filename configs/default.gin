@@ -32,5 +32,13 @@ Habitat.task = 'pointnav'
 Habitat.dataset = 'habitat_test'
 Habitat.gpu_id = 0
 Habitat.image_key = 'rgb'
-Habitat.slack_reward = -0.01
-Habitat.success_reward = 10.0
+
+DenseReward.slack_reward = -0.01
+DenseReward.success_reward = 10.0
+DenseReward.distance_scaling = 1.0
+OptimalPathLengthReward.scaling = 1.0
+CollisionPenalty.scaling = 1.0
+ObstacleDistancePenalty.threshold = 0.5
+ObstacleDistancePenalty.scaling = 1.0
+Habitat.reward_function = @combine_rewards()
+combine_rewards.rewards = [@DenseReward, @CollisionPenalty, @ObstacleDistancePenalty]

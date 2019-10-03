@@ -2,7 +2,7 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import Any, Dict, List, Optional, Tuple, TypeVar, Union, cast
+from typing import Any, Dict, Optional, Tuple, Type, TypeVar, Union
 
 import gin
 import gym.spaces
@@ -13,64 +13,45 @@ from loguru import logger
 
 from project.util import capture_output, get_config_dir
 
+from .rewards import RewardFunction
+
 ObsTuple = Tuple[Observations, Any, bool, dict]
 
 
-@gin.configurable(whitelist=['task', 'dataset', 'gpu_id', 'image_key', 'slack_reward', 'success_reward'])
+@gin.configurable(whitelist=['task', 'dataset', 'gpu_id', 'image_key', 'reward_function'])
 class Habitat:
-    """
-    Singleton wrapper for Habitat.
-
-    Reward function is based on
-    github.com/facebookresearch/habitat-api/blob/master/habitat_baselines/common/environments.py
-    """
+    """Singleton wrapper for Habitat."""
     class __Habitat(habitat.RLEnv):
-        observation_space: gym.spaces.Dict
-        action_space: gym.Space
-
-        def __init__(self, config: habitat.Config, image_key: str, slack_reward: float, success_reward: float) -> None:
+        def __init__(self, config: habitat.Config, image_key: str, reward_function: Type[RewardFunction]) -> None:
             self._image_key = image_key
-            self._slack_reward = slack_reward
-            self._success_reward = success_reward
-            self._success_distance = config.TASK.SUCCESS_DISTANCE
-            self._previous_target_distance = None
-            self._previous_action = None
+            self._reward_function = reward_function(self)
+            self._previous_action: Optional[int] = None
+            self.success_distance = config.TASK.SUCCESS_DISTANCE
+            self.stop_action: int = habitat.SimulatorActions.STOP
 
             super().__init__(config)
-            self.observation_space = gym.spaces.Dict(self._update_key(self.observation_space.spaces))
+            self.observation_space: gym.spaces.Dict = gym.spaces.Dict(self._update_key(self._env.observation_space.spaces))
+            self.action_space = self._env.action_space
 
-        def get_reward_range(self) -> List[float]:
-            return [
-                self._slack_reward - 1.0,
-                self._success_reward + 1.0,
-            ]
+        def get_reward_range(self) -> Tuple[float, float]:
+            return self._reward_function.get_reward_range()
 
         def get_reward(self, observations: Observations) -> float:
-            reward = self._slack_reward
+            return self._reward_function.get_reward(observations)
 
-            current_target_distance = self._distance_target()
-            reward += self._previous_target_distance - current_target_distance
-            self._previous_target_distance = current_target_distance
+        def get_done(self, observations: Observations) -> bool:
+            return self._env.episode_over or self.episode_success()
 
-            if self._episode_success():
-                reward += self._success_reward
+        def episode_success(self) -> bool:
+            return self._previous_action == self.stop_action and self.distance_to_target() < self.success_distance
 
-            return reward
-
-        def _distance_target(self) -> float:
+        def distance_to_target(self) -> float:
             current_position = self._env.sim.get_agent_state().position.tolist()
-            target_position = self._env.current_episode.goals[0].position
+            target_position = self._env.current_episode.goals[0].position  # type: ignore
             distance = self._env.sim.geodesic_distance(
                 current_position, target_position
             )
             return distance
-
-        def get_done(self, observations: Observations) -> bool:
-            return self._env.episode_over or self._episode_success()
-
-        def _episode_success(self) -> bool:
-            return self._previous_action == habitat.SimulatorActions.STOP and \
-                   self._distance_target() < self._success_distance
 
         def get_info(self, observations: Observations) -> Dict[Any, Any]:
             return self.habitat_env.get_metrics()
@@ -83,9 +64,8 @@ class Habitat:
 
         def reset(self) -> Observations:
             self._previous_action = None
-            observations = super().reset()
-            self._previous_target_distance = self.habitat_env.current_episode.info["geodesic_distance"]
-            return self._update_key(observations)
+            self._reward_function.reset()
+            return self._update_key(super().reset())
 
         _ObsOrDict = TypeVar('_ObsOrDict', Observations, Dict['str', Any])
 
@@ -112,12 +92,10 @@ class Habitat:
                  dataset: str = 'pointnav',
                  gpu_id: int = 0,
                  image_key: str = 'rgb',
-                 slack_reward: float = -0.01,
-                 success_reward: float = 10.0) -> None:
+                 reward_function: Type[RewardFunction] = RewardFunction) -> None:
         self.config = get_config(max_steps, task, dataset, gpu_id)
         self.image_key = image_key
-        self.slack_reward = slack_reward
-        self.success_reward = success_reward
+        self.reward_function = reward_function
         self.__create_instance()
 
     def __create_instance(self) -> None:
@@ -128,7 +106,7 @@ class Habitat:
             self.close()
         logger.debug("Creating Habitat instance.")
         with capture_output('habitat_sim'):
-            Habitat.__instance = Habitat.__Habitat(self.config, self.image_key, self.slack_reward, self.success_reward)
+            Habitat.__instance = Habitat.__Habitat(self.config, self.image_key, self.reward_function)
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self.__instance, name)
