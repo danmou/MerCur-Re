@@ -69,3 +69,19 @@ class MinimumDuration(Wrapper):
     def reset(self, **kwargs: Any) -> Observations:
         self._step = 0
         return cast(Observations, self.env.reset(**kwargs))
+
+
+@gin.configurable(whitelist=['enable'])
+class AutomaticStop(Wrapper):
+    """Removes the stop action from the action space and triggers it automatically when the goal is reached."""
+    def __init__(self, env: gym.Env, enable: bool = False) -> None:
+        super().__init__(env)
+        self._enable = enable
+        self.action_space = gym.spaces.Discrete(self.env.action_space.n - 1)
+
+    def step(self, action: int) -> ObsTuple:
+        if self._enable and self.env.distance_to_target() < self.env.success_distance:
+            action = self.env.stop_action
+        elif action >= self.env.stop_action:
+            action += 1
+        return super().step(action)

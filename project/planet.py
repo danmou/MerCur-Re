@@ -64,6 +64,7 @@ def habitat_env_ctor(action_repeat: int, min_length: int, max_length: int) -> gy
     assert min_length <= max_length, f'{min_length}>{max_length}!'
     logger.debug(f'Collecting episodes between {min_length} and {max_length} steps in length.')
     env = Habitat(max_steps=max_length*action_repeat)
+    env = wrappers.AutomaticStop(env)
     env = planet_wrappers.ActionRepeat(env, action_repeat)
     env = wrappers.DiscreteWrapper(env)
     env = wrappers.MinimumDuration(env, min_length, stop_index=habitat.SimulatorActions.STOP)
@@ -72,7 +73,7 @@ def habitat_env_ctor(action_repeat: int, min_length: int, max_length: int) -> gy
 
 def planet_habitat_task(config: planet.tools.AttrDict, params: planet.tools.AttrDict) -> PlanetTask:
     action_repeat = params.get('action_repeat', 1)
-    max_length = params['max_task_length']
+    max_length = params.max_task_length
     state_components = ['reward', 'goal']
     env_ctor = planet.tools.bind(
         habitat_env_ctor, action_repeat, config.batch_shape[1], max_length)
