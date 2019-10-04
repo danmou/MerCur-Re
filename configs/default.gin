@@ -1,4 +1,4 @@
-main.logdir = 'logs'
+main.base_logdir = 'logs'
 logging.mute = ['matplotlib', 'PIL']
 
 planet.num_runs = 1

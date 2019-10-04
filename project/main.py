@@ -19,14 +19,18 @@ from project.planet import run
 from project.util import get_config_dir
 
 
-@gin.configurable(whitelist=['logdir'])
-def main(verbosity: str, logdir: Union[str, Path], name: Optional[str] = None) -> None:
+@gin.configurable(whitelist=['base_logdir'])
+def main(verbosity: str, base_logdir: Union[str, Path], name: Optional[str] = None) -> None:
     deprecation._PRINT_DEPRECATION_WARNINGS = False
     logdir_name = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     if name:
         logdir_name += f'-{name}'
-    logdir = Path(logdir) / logdir_name
+    logdir = Path(base_logdir) / logdir_name
     logdir.mkdir(parents=True)
+    latest_symlink = Path(base_logdir) / 'latest'
+    if latest_symlink.exists():
+        latest_symlink.unlink()
+    latest_symlink.symlink_to(logdir)
     init_logging(verbosity, logdir)
     wandb.config.update({name.rsplit('.', 1)[-1]: conf
                          for (_, name), conf in gin.config._CONFIG.items()
@@ -47,7 +51,7 @@ def main_configure(config: str,
     # extra_options = tuple(opt.lstrip('-') for opt in extra_options)
     gin.parse_config_files_and_bindings([config], extra_options)
     with gin.unlock_config():
-        gin.bind_parameter('main.logdir', str(Path(gin.query_parameter('main.logdir')).absolute()))
+        gin.bind_parameter('main.base_logdir', str(Path(gin.query_parameter('main.base_logdir')).absolute()))
     tempdir = None
     try:
         if data:
@@ -92,7 +96,7 @@ def main_command(config: str,
     elif verbosity in ['DEBUG', 'TRACE']:
         verbose = True
     if logdir:
-        extra_options += (f'main.logdir="{logdir}"',)
+        extra_options += (f'main.base_logdir="{logdir}"',)
     if debug:
         os.environ['WANDB_MODE'] = 'dryrun'
     if config is None:

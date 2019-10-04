@@ -1,6 +1,6 @@
 include 'configs/default.gin'
 
-main.logdir = 'debug_logs'
+main.base_logdir = 'debug_logs'
 
 planet.params.action_repeat = 5
 planet.params.num_seed_episodes = 1
