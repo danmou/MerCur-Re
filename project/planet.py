@@ -122,6 +122,7 @@ def create_tf_session(debugger: bool = False) -> tf.Session:
                                                                             'localhost:6064',
                                                                             send_traceback_and_source_code=False))
     logger.debug('Initialized TF')
+    logger.trace(f'Config:\n{gin.operative_config_str()}')
     return sess
 
 
