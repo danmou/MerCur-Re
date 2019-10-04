@@ -35,6 +35,7 @@ def main(verbosity: str, base_logdir: Union[str, Path], name: Optional[str] = No
     wandb.config.update({name.rsplit('.', 1)[-1]: conf
                          for (_, name), conf in gin.config._CONFIG.items()
                          if name is not None})
+    wandb.config.update({'cuda_gpus': os.environ['CUDA_VISIBLE_DEVICES']})
     with logger.catch(BaseException, level='TRACE', reraise=True):
         with logger.catch():
             run(str(logdir))
