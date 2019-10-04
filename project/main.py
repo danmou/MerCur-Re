@@ -31,8 +31,9 @@ def main(verbosity: str, logdir: Union[str, Path], name: Optional[str] = None) -
     wandb.config.update({name.rsplit('.', 1)[-1]: conf
                          for (_, name), conf in gin.config._CONFIG.items()
                          if name is not None})
-    with logger.catch():
-        run(str(logdir))
+    with logger.catch(BaseException, level='TRACE', reraise=True):
+        with logger.catch():
+            run(str(logdir))
 
 
 def main_configure(config: str,
