@@ -36,7 +36,7 @@ planet.tf.gpu_options.visible_device_list = '1'
 planet.tf.debugger = False
 
 DiscreteWrapper.sample = False
-AutomaticStop.enable = False
+AutomaticStop.enable = True
 Habitat.task = 'pointnav'
 Habitat.dataset = 'habitat_test'
 Habitat.gpu_id = 0
