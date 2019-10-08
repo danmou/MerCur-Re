@@ -65,6 +65,7 @@ class Habitat:
             self._previous_action = action
             obs, reward, done, info = super().step(action)
             obs = self._update_keys(obs)
+            info['taken_action'] = action
             return obs, reward, done, info
 
         def reset(self) -> Observations:
