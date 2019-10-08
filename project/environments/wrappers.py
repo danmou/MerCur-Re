@@ -2,7 +2,7 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import Any, Dict, Tuple, cast
+from typing import Any, Dict, Tuple, Optional, cast
 
 import gin
 import gym.spaces
@@ -48,16 +48,15 @@ class DiscreteWrapper(Wrapper):
 
 class MinimumDuration(Wrapper):
     """Extends the episode to a given lower number of decision points by preventing stop actions."""
-    def __init__(self, env: gym.Env, duration: int, stop_index: int = 0) -> None:
+    def __init__(self, env: gym.Env, duration: int) -> None:
         super().__init__(env)
         self._duration = duration
-        self._stop_index = stop_index
         self._step = 0
 
     def step(self, action: np.ndarray) -> ObsTuple:
         self._step += 1
         if self._step < self._duration:
-            action[self._stop_index] = self.action_space.low[self._stop_index]  # set stop probability to zero
+            action[self.env.stop_action] = self.action_space.low[self.env.stop_action]  # set stop probability to zero
         obs, reward, done, info = cast(ObsTuple, self.env.step(action))
         if done:
             if self._step < self._duration:
@@ -74,14 +73,23 @@ class MinimumDuration(Wrapper):
 @gin.configurable(whitelist=['enable'])
 class AutomaticStop(Wrapper):
     """Removes the stop action from the action space and triggers it automatically when the goal is reached."""
-    def __init__(self, env: gym.Env, enable: bool = False) -> None:
+    def __init__(self, env: gym.Env, enable: bool = False, minimum_duration: int = 0) -> None:
         super().__init__(env)
         self._enable = enable
-        self.action_space = gym.spaces.Discrete(self.env.action_space.n - 1)
+        self._duration = minimum_duration
+        self._step = 0
+        if self._enable:
+            self.action_space = gym.spaces.Discrete(self.env.action_space.n - 1)
 
     def step(self, action: int) -> ObsTuple:
-        if self._enable and self.env.distance_to_target() < self.env.success_distance:
-            action = self.env.stop_action
-        elif action >= self.env.stop_action:
-            action += 1
+        self._step += 1
+        if self._enable:
+            if self._step >= self._duration and self.env.distance_to_target() < self.env.success_distance:
+                action = self.env.stop_action
+            elif action >= self.env.stop_action:
+                action += 1
         return super().step(action)
+
+    def reset(self, **kwargs: Any) -> Observations:
+        self._step = 0
+        return cast(Observations, self.env.reset(**kwargs))

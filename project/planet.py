@@ -8,7 +8,6 @@ from typing import Any, Dict, Generator, List, cast
 
 import gin
 import gym
-import habitat
 import planet.control.wrappers as planet_wrappers
 import planet.tools
 import planet.training
@@ -64,10 +63,10 @@ def habitat_env_ctor(action_repeat: int, min_length: int, max_length: int) -> gy
     assert min_length <= max_length, f'{min_length}>{max_length}!'
     logger.debug(f'Collecting episodes between {min_length} and {max_length} steps in length.')
     env = Habitat(max_steps=max_length*action_repeat)
-    env = wrappers.AutomaticStop(env)
+    env = wrappers.AutomaticStop(env, minimum_duration=min_length)
     env = planet_wrappers.ActionRepeat(env, action_repeat)
     env = wrappers.DiscreteWrapper(env)
-    env = wrappers.MinimumDuration(env, min_length, stop_index=habitat.SimulatorActions.STOP)
+    env = wrappers.MinimumDuration(env, min_length)
     return env
 
 
