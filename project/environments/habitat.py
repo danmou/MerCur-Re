@@ -18,19 +18,24 @@ from .rewards import RewardFunction
 ObsTuple = Tuple[Observations, Any, bool, dict]
 
 
-@gin.configurable(whitelist=['task', 'dataset', 'gpu_id', 'image_key', 'reward_function'])
+@gin.configurable(whitelist=['task', 'dataset', 'gpu_id', 'image_key', 'goal_key', 'reward_function'])
 class Habitat:
     """Singleton wrapper for Habitat."""
     class __Habitat(habitat.RLEnv):
-        def __init__(self, config: habitat.Config, image_key: str, reward_function: Type[RewardFunction]) -> None:
+        def __init__(self,
+                     config: habitat.Config,
+                     image_key: str,
+                     goal_key: str,
+                     reward_function: Type[RewardFunction]) -> None:
             self._image_key = image_key
+            self._goal_key = goal_key
             self._reward_function = reward_function(self)
             self._previous_action: Optional[int] = None
             self.success_distance = config.TASK.SUCCESS_DISTANCE
             self.stop_action: int = habitat.SimulatorActions.STOP
 
             super().__init__(config)
-            self.observation_space: gym.spaces.Dict = gym.spaces.Dict(self._update_key(self._env.observation_space.spaces))
+            self.observation_space: gym.spaces.Dict = gym.spaces.Dict(self._update_keys(self._env.observation_space.spaces))
             self.action_space = self._env.action_space
 
         def get_reward_range(self) -> Tuple[float, float]:
@@ -59,19 +64,20 @@ class Habitat:
         def step(self, action: int) -> ObsTuple:
             self._previous_action = action
             obs, reward, done, info = super().step(action)
-            obs = self._update_key(obs)
+            obs = self._update_keys(obs)
             return obs, reward, done, info
 
         def reset(self) -> Observations:
             self._previous_action = None
             self._reward_function.reset()
-            return self._update_key(super().reset())
+            return self._update_keys(super().reset())
 
         _ObsOrDict = TypeVar('_ObsOrDict', Observations, Dict['str', Any])
 
-        def _update_key(self, obs: '_ObsOrDict') -> '_ObsOrDict':
+        def _update_keys(self, obs: '_ObsOrDict') -> '_ObsOrDict':
             obs_dict = obs.copy()  # copy converts to dict
             obs_dict['image'] = obs_dict.pop(self._image_key)
+            obs_dict['goal'] = obs_dict.pop(self._goal_key)
             # Convert back to original type (Observations.__init__ tries to process the input dict)
             obs = type(obs)({})
             obs.update(obs_dict)
@@ -92,9 +98,11 @@ class Habitat:
                  dataset: str = 'pointnav',
                  gpu_id: int = 0,
                  image_key: str = 'rgb',
+                 goal_key: str = 'pointgoal_with_gps_compass',
                  reward_function: Type[RewardFunction] = RewardFunction) -> None:
         self.config = get_config(max_steps, task, dataset, gpu_id)
         self.image_key = image_key
+        self.goal_key = goal_key
         self.reward_function = reward_function
         self.__create_instance()
 
@@ -106,7 +114,7 @@ class Habitat:
             self.close()
         logger.debug("Creating Habitat instance.")
         with capture_output('habitat_sim'):
-            Habitat.__instance = Habitat.__Habitat(self.config, self.image_key, self.reward_function)
+            Habitat.__instance = Habitat.__Habitat(self.config, self.image_key, self.goal_key, self.reward_function)
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self.__instance, name)

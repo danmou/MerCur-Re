@@ -15,6 +15,15 @@ planet.params.test_steps = 50
 planet.params.max_steps = 5e7  # Maximum number of training steps
 planet.params.max_task_length = 500  # Maximum sequence length
 planet.params.divergence_scale = 1.0
+planet.params.image_loss_scale = 1.0
+planet.params.goal_loss_scale = 1.0
+planet.params.additional_observations = ['goal']
+planet.params.gradient_heads = ['image', 'goal', 'reward']
+
+planet.params.model_size = 200  # belief_size, embed_size
+planet.params.state_size = 30
+planet.params.num_layers = 1  # used for reward and goal prediction
+planet.params.num_units = 100  # used for reward and goal prediction
 
 planet.tf.options.log_device_placement = False
 # planet.tf.options.device_count = {'GPU': 0, 'CPU': 4}
@@ -32,6 +41,7 @@ Habitat.task = 'pointnav'
 Habitat.dataset = 'habitat_test'
 Habitat.gpu_id = 0
 Habitat.image_key = 'rgb'
+Habitat.goal_key = 'pointgoal_with_gps_compass'
 
 DenseReward.slack_reward = -0.01
 DenseReward.success_reward = 10.0

@@ -73,10 +73,11 @@ def habitat_env_ctor(action_repeat: int, min_length: int, max_length: int) -> gy
 def planet_habitat_task(config: planet.tools.AttrDict, params: planet.tools.AttrDict) -> PlanetTask:
     action_repeat = params.get('action_repeat', 1)
     max_length = params.max_task_length
-    state_components = ['reward', 'goal']
+    state_components = ['reward']
+    observation_components = ['image', 'goal']
     env_ctor = planet.tools.bind(
         habitat_env_ctor, action_repeat, config.batch_shape[1], max_length)
-    return PlanetTask('habitat', env_ctor, max_length, state_components)
+    return PlanetTask('habitat', env_ctor, max_length, state_components, observation_components)
 
 
 @gin.configurable('planet.tf.options')
