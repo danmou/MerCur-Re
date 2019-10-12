@@ -1,40 +1,60 @@
 main.base_logdir = 'logs'
 logging.mute = ['matplotlib', 'PIL']
 
+### Planet ###
+# Basic
 planet.num_runs = 1
 planet.ping_every = 0
 planet.resume_runs = False
 planet.config = 'default'
 
+# Task
 planet.params.tasks = ['habitat']
 planet.params.isolate_envs = 'none'  # Don't change
 planet.params.action_repeat = 1
-planet.params.num_seed_episodes = 5
+planet.params.max_task_length = 500  # Maximum sequence length
+planet.params.gradient_heads = ['image', 'goal', 'reward']
+planet.params.train_action_noise = 0.3
+
+# Schedule
+planet.params.num_seed_episodes = 20
+planet.params.collect_every = 2500
 planet.params.train_steps = 5e3
 planet.params.test_steps = 50
-planet.params.max_steps = 5e7  # Maximum number of training steps
-planet.params.max_task_length = 500  # Maximum sequence length
+planet.params.max_steps = 1e6  # Maximum number of training + test steps
+
+# Losses
 planet.params.divergence_scale = 1.0
 planet.params.image_loss_scale = 1.0
-planet.params.goal_loss_scale = 1.0
-planet.params.additional_observations = ['goal']
-planet.params.gradient_heads = ['image', 'goal', 'reward']
+planet.params.reward_loss_scale = 10.0
+planet.params.goal_loss_scale = 10.0
 
+# Model complexity
 planet.params.model_size = 200  # belief_size, embed_size
 planet.params.state_size = 30
 planet.params.num_layers = 1  # used for reward and goal prediction
 planet.params.num_units = 100  # used for reward and goal prediction
 
+# Planner
+planet.params.planner = 'cem'
+planet.params.planner_horizon = 12
+planet.params.planner_iterations = 10
+planet.params.planner_amount = 1000  # number of action sequence samples per iteration
+planet.params.planner_topk = 100  # number of best samples to use as basis for next iteration
+
+# TF options
 planet.tf.options.log_device_placement = False
 # planet.tf.options.device_count = {'GPU': 0, 'CPU': 4}
 planet.tf.options.inter_op_parallelism_threads = 1  # Don't change
+planet.tf.debugger = False
 
+# GPU options
 planet.tf.gpu_options.allow_growth = True
 planet.tf.gpu_options.visible_device_list = '1'
 # planet.tf.gpu_options.per_process_gpu_memory_fraction = 0.5
 
-planet.tf.debugger = False
-
+### Habitat ###
+# Basic
 DiscreteWrapper.sample = False
 AutomaticStop.enable = True
 Habitat.task = 'pointnav'
@@ -43,6 +63,7 @@ Habitat.gpu_id = 0
 Habitat.image_key = 'rgb'
 Habitat.goal_key = 'pointgoal_with_gps_compass'
 
+# Reward
 DenseReward.slack_reward = -0.01
 DenseReward.success_reward = 10.0
 DenseReward.distance_scaling = 1.0
