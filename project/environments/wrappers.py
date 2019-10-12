@@ -40,6 +40,9 @@ class DiscreteWrapper(Wrapper):
     def step(self, action: np.ndarray) -> ObsTuple:
         if self._sample:
             action = action + 1  # shift to make values positive
+            if np.sum(action) < 0.01:
+                action += 0.01
+            assert np.sum(action) > 0, action
             act = np.random.choice(len(action), p=action/np.sum(action))
         else:
             act = np.argmax(action)
