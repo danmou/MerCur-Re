@@ -1,0 +1,24 @@
+program: run.py
+method: random
+parameters:
+  planet.params.max_steps:
+    value: 3e5
+  planet.params.planner_horizon:
+    distribution: q_log_uniform
+    min: 1.6  # 5
+    max: 3.92  # 50
+  planet.params.planner_iterations:
+    distribution: q_log_uniform
+    min: 1.6  # 5
+    max: 3.92  # 50
+  planet.params.planner_amount:
+    distribution: q_log_uniform
+    min: 4.61  # 100
+    max: 9.2103  # 5e3
+  planet.params.planner_topk:
+    distribution: q_log_uniform
+    min: 2.3  # 10
+    max: 6.215  # 500
+conditions:
+  - 'planner_topk < planner_amount'
+  - 'planner_horizon*planner_iterations*planner_amount < 2*12*10*1000'  # No more than triple the complexity

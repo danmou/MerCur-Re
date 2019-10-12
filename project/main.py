@@ -20,7 +20,11 @@ from project.util import get_config_dir
 
 
 @gin.configurable(whitelist=['base_logdir'])
-def main(verbosity: str, debug: bool, base_logdir: Union[str, Path], name: Optional[str] = None) -> None:
+def main(verbosity: str,
+         base_logdir: Union[str, Path] = gin.REQUIRED,
+         debug: bool = False,
+         catch_exceptions: bool = True,
+         name: Optional[str] = None) -> None:
     deprecation._PRINT_DEPRECATION_WARNINGS = False
     logdir_name = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     if name:
@@ -36,15 +40,19 @@ def main(verbosity: str, debug: bool, base_logdir: Union[str, Path], name: Optio
                          for (_, name), conf in gin.config._CONFIG.items()
                          if name is not None})
     wandb.config.update({'cuda_gpus': os.environ['CUDA_VISIBLE_DEVICES']})
-    with logger.catch(BaseException, level='TRACE', reraise=True):
-        with logger.catch(reraise=debug):
+    with logger.catch(BaseException, level='TRACE', reraise=not catch_exceptions):
+        if catch_exceptions:
+            with logger.catch(reraise=debug):
+                run(str(logdir))
+        else:
             run(str(logdir))
 
 
 def main_configure(config: str,
                    extra_options: Tuple[str, ...],
                    verbosity: str,
-                   debug: bool,
+                   debug: bool = False,
+                   catch_exceptions: bool = True,
                    data: Optional[str] = None,
                    name: Optional[str] = None,
                    ) -> None:
@@ -61,7 +69,7 @@ def main_configure(config: str,
             tempdir = TemporaryDirectory()
             (Path(tempdir.name) / 'data').symlink_to(Path(data).absolute())
             os.chdir(tempdir.name)
-        main(verbosity, debug, name=name)
+        main(verbosity, debug=debug, catch_exceptions=catch_exceptions, name=name)
     finally:
         if tempdir:
             tempdir.cleanup()
@@ -110,4 +118,4 @@ def main_command(config: str,
         os.environ['CUDA_VISIBLE_DEVICES'] = '0'
     if gpus is not None:
         os.environ['CUDA_VISIBLE_DEVICES'] = gpus
-    main_configure(config, extra_options, verbosity, debug, data, name)
+    main_configure(config, extra_options, verbosity, debug, True, data, name)
