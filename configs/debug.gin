@@ -4,9 +4,9 @@ main.base_logdir = 'debug_logs'
 
 planet.params.action_repeat = 5
 planet.params.num_seed_episodes = 1
-planet.params.train_steps = 10
-planet.params.test_steps = 10
-planet.params.max_steps = 40  # Maximum number of training steps
+planet.params.train_steps = 2
+planet.params.test_steps = 2
+planet.params.max_epochs = 2  # Maximum number of epochs
 planet.params.max_task_length = 10  # Maximum sequence length
 planet.params.collect_every = 10
 planet.params.model_size = 10

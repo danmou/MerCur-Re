@@ -18,10 +18,10 @@ planet.params.train_action_noise = 0.3
 
 # Schedule
 planet.params.num_seed_episodes = 20
-planet.params.collect_every = 2500
-planet.params.train_steps = 5e3
-planet.params.test_steps = 50
-planet.params.max_steps = 1e6  # Maximum number of training + test steps
+planet.params.collect_every = 50
+planet.params.train_steps = 100  # training batches per epoch
+planet.params.test_steps = 1  # test steps per epoch
+planet.params.max_epochs = 200  # maximum number of epochs
 
 # Losses
 planet.params.divergence_scale = 1.0

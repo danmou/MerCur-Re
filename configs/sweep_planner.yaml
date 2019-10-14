@@ -1,8 +1,8 @@
 program: run.py
 method: random
 parameters:
-  planet.params.max_steps:
-    value: 3e5
+  planet.params.max_epochs:
+    value: 60
   planet.params.planner_horizon:
     distribution: q_log_uniform
     min: 1.6  # 5
