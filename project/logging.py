@@ -10,6 +10,7 @@ from typing import List, Optional, Union
 
 import gin
 import tensorflow as tf
+import wandb
 from loguru import logger
 from tensorflow.python import logging as tf_logging
 
@@ -52,17 +53,16 @@ def init_logging(verbosity: str, logdir: Union[str, Path]) -> None:
     # Intercept all third-party logging
     logging.basicConfig(handlers=[InterceptHandler()], level=0)
 
-    # Log to stdout and logfile
-    logger.add(sys.stdout,
-               format='<level>[{level[0]}] {time:HH:mm:ss}</level> {message}',
-               level=verbosity,
-               backtrace=True,
-               diagnose=True)
-    logfile = Path(logdir) / 'output.log'
-    logger.add(logfile,
-               level='TRACE',
-               backtrace=True,
-               diagnose=True)
+    # Log to stdout and logfiles
+    trace_logfile = Path(logdir) / 'trace.log'
+    info_logfile = Path(logdir) / f'info.log'
+    kwargs = dict(backtrace=True, diagnose=True)
+    logger.add(trace_logfile, level='TRACE', **kwargs)
+    kwargs['format'] = '<level>[{level[0]}] {time:HH:mm:ss}</level> {message}'
+    logger.add(info_logfile, level='INFO', **kwargs)
+    logger.add(sys.stdout, level=verbosity, **kwargs)
+    wandb.save(str(trace_logfile))
+    wandb.save(str(info_logfile))
 
     logger.debug('Initialized.')
-    logger.debug(f'Logging to {logfile}.')
+    logger.debug(f'Logging to {info_logfile} and {trace_logfile}.')
