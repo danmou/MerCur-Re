@@ -13,7 +13,7 @@ requirements = [
     'click',
     'gin-config',
     'gym==0.10.9',
-    'habitat',
+    'habitat>=0.1.3',
     'loguru',
     'numpy<1.17',  # 1.17 results in deprecation warnings with TF 1.13
     'planetrl',

@@ -9,6 +9,8 @@ import gym.spaces
 import habitat
 import wandb
 from habitat.core.simulator import Observations
+from habitat.sims.habitat_simulator.actions import HabitatSimActions
+from habitat.tasks.nav.nav import NavigationEpisode
 from loguru import logger
 
 from project.util import capture_output, get_config_dir
@@ -16,6 +18,27 @@ from project.util import capture_output, get_config_dir
 from .rewards import RewardFunction
 
 ObsTuple = Tuple[Observations, Any, bool, dict]
+
+
+@habitat.registry.register_measure
+class Success(habitat.Measure):
+    def __init__(self, *args: Any, sim: habitat.Simulator, config: habitat.Config, **kwargs: Any) -> None:
+        self._sim = sim
+        self._config = config
+        super().__init__(*args, **kwargs)
+
+    def _get_uuid(self, *args: Any, **kwargs: Any) -> str:
+        return "success"
+
+    def reset_metric(self, *args: Any, episode, **kwargs: Any) -> None:
+        self._metric = None
+
+    def update_metric(self, *args: Any, episode: NavigationEpisode, task: habitat.EmbodiedTask, **kwargs: Any) -> None:
+        current_position = self._sim.get_agent_state().position.tolist()
+        distance_to_target = self._sim.geodesic_distance(current_position, episode.goals[0].position)
+
+        self._metric = int(getattr(task, "is_stop_called", False) and
+                           distance_to_target < self._config.SUCCESS_DISTANCE)
 
 
 @gin.configurable(whitelist=['task', 'dataset', 'gpu_id', 'image_key', 'goal_key', 'reward_function'])
@@ -32,7 +55,7 @@ class Habitat:
             self._reward_function = reward_function(self)
             self._previous_action: Optional[int] = None
             self.success_distance = config.TASK.SUCCESS_DISTANCE
-            self.stop_action: int = habitat.SimulatorActions.STOP
+            self.stop_action: int = HabitatSimActions.STOP
 
             super().__init__(config)
             self.observation_space: gym.spaces.Dict = gym.spaces.Dict(self._update_keys(self._env.observation_space.spaces))
@@ -59,7 +82,15 @@ class Habitat:
             return distance
 
         def get_info(self, observations: Observations) -> Dict[Any, Any]:
-            return self.habitat_env.get_metrics()
+            metrics = self.habitat_env.get_metrics()
+            if 'distance_to_goal' in metrics:
+                dist_dict = metrics.pop('distance_to_goal')
+                metrics['path_length'] = dist_dict['agent_path_length']
+                metrics['optimal_path_length'] = dist_dict['start_distance_to_target']
+                metrics['remaining_distance'] = dist_dict['distance_to_target']
+            if 'collisions' in metrics:
+                metrics['collisions'] = metrics['collisions']['count']
+            return metrics
 
         def step(self, action: int) -> ObsTuple:
             self._previous_action = action
@@ -138,4 +169,11 @@ def get_config(max_steps: Optional[Union[int, float]],
         task = f'{get_config_dir()}/habitat/tasks/{task}.yaml'
     if not dataset.endswith('.yaml'):
         dataset = f'{get_config_dir()}/habitat/datasets/{dataset}.yaml'
-    return habitat.get_config([task, dataset], opts)
+    config = habitat.get_config([task, dataset], opts)
+    config.defrost()
+    config.TASK.SUCCESS = habitat.Config()
+    config.TASK.SUCCESS.TYPE = "Success"
+    config.TASK.SUCCESS.SUCCESS_DISTANCE = config.TASK.SUCCESS_DISTANCE
+    config.TASK.MEASUREMENTS.append("SUCCESS")
+    config.freeze()
+    return config

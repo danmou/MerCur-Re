@@ -16,7 +16,7 @@ SIMULATOR:
 
 TASK:
   TYPE: 'Nav-v0'
-  SUCCESS_DISTANCE: 0.2  # meters
+  SUCCESS_DISTANCE: &success_distance 0.2  # meters
 
   SENSORS: ['POINTGOAL_WITH_GPS_COMPASS_SENSOR']
   POINTGOAL_WITH_GPS_COMPASS_SENSOR:
@@ -24,9 +24,11 @@ TASK:
     DIMENSIONALITY: 2
   GOAL_SENSOR_UUID: 'pointgoal_with_gps_compass'
 
-  MEASUREMENTS: ['SPL', 'COLLISIONS']
+  MEASUREMENTS: ['SPL', 'COLLISIONS', 'DISTANCE_TO_GOAL']
   SPL:
     TYPE: 'SPL'
-    SUCCESS_DISTANCE: 0.2  # meters
+    SUCCESS_DISTANCE: *success_distance
   COLLISIONS:
     TYPE: 'Collisions'
+  DISTANCE_TO_GOAL:
+    TYPE: 'DistanceToGoal'

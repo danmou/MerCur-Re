@@ -75,9 +75,10 @@ def planet_habitat_task(config: planet.tools.AttrDict, params: planet.tools.Attr
     max_length = params.max_task_length
     state_components = ['reward']
     observation_components = ['image', 'goal']
+    metrics = ['success', 'spl', 'path_length', 'optimal_path_length', 'remaining_distance', 'collisions']
     env_ctor = planet.tools.bind(
         habitat_env_ctor, action_repeat, config.batch_shape[1], max_length)
-    return PlanetTask('habitat', env_ctor, max_length, state_components, observation_components)
+    return PlanetTask('habitat', env_ctor, max_length, state_components, observation_components, metrics)
 
 
 @gin.configurable('planet.tf.options')
