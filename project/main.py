@@ -36,16 +36,23 @@ def main(verbosity: str,
         latest_symlink.unlink()
     latest_symlink.symlink_to(logdir)
     init_logging(verbosity, logdir)
+    wandb.save(f'{logdir}/checkpoint')
+    wandb.save(f'{logdir}/*.ckpt*')
     wandb.config.update({name.rsplit('.', 1)[-1]: conf
                          for (_, name), conf in gin.config._CONFIG.items()
                          if name is not None})
     wandb.config.update({'cuda_gpus': os.environ['CUDA_VISIBLE_DEVICES']})
     with logger.catch(BaseException, level='TRACE', reraise=not catch_exceptions):
-        if catch_exceptions:
-            with logger.catch(reraise=debug):
+        try:
+            if catch_exceptions:
+                with logger.catch(reraise=debug):
+                    run(str(logdir))
+            else:
                 run(str(logdir))
-        else:
-            run(str(logdir))
+        finally:
+            # Make sure all checkpoints get uploaded
+            wandb.save(f'{logdir}/checkpoint', policy='end')
+            wandb.save(f'{logdir}/*.ckpt*', policy='end')
 
 
 def main_configure(config: str,

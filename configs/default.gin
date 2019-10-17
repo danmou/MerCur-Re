@@ -19,6 +19,13 @@ planet.num_test_episodes = 10  # episodes per test data collection (these are al
 planet.train_steps = 100  # training batches per epoch
 planet.test_steps = 1  # test steps per epoch
 planet.max_epochs = 200  # maximum number of epochs
+planet.checkpoint_every = 5  # epochs between checkpoints
+planet.checkpoint_to_load = None  # can be a dir or a specific file, absolute or relative to the logdir
+
+# Example: continue from still-gorge-205
+# planet.checkpoint_to_load = '../20191010-114731/00001'
+# planet.checkpoint_load_exclude = [r'.*collect_.*_main_habitat.*']  # For compatibility with old checkpoints
+# planet.max_epochs = 20000
 
 # Losses
 planet.divergence_scale = 1.0

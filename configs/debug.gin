@@ -12,6 +12,7 @@ planet.train_collect_every = 1  # epochs per training data collection
 planet.num_train_episodes = 1  # training episodes per data collection
 planet.test_collect_every = 1  # epochs per test data collection
 planet.num_test_episodes = 1  # episodes per test data collection (these are also used for evaluation)
+planet.checkpoint_every = 2
 planet.model_size = 10
 planet.state_size = 5
 planet.num_layers = 1
