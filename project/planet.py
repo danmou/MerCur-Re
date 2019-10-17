@@ -16,47 +16,31 @@ import tensorflow as tf
 from loguru import logger
 from planet.scripts.configs import tasks_lib
 from planet.scripts.tasks import Task as PlanetTask
-from planet.scripts.train import process as planet_process_fn
+from planet.scripts.train import process as planet_process
 from tensorflow.python import debug as tf_debug
 
 from .environments import Habitat, wrappers
 from .util import capture_output
 
 
-@gin.configurable('planet.params')
+@gin.configurable('planet')
 class PlanetParams(planet.tools.AttrDict):
     pass
 
 
-@gin.configurable('planet')
-def run(logdir: str,
-        num_runs: int = 1000,
-        ping_every: int = 0,
-        resume_runs: bool = False,
-        config: str = 'default',
-        ) -> None:
+def run(logdir: str) -> None:
     params = PlanetParams()
     if not params.get('tasks'):
         params.tasks = ['habitat']
     args = planet.tools.AttrDict()
     with args.unlocked:
         args.logdir = logdir
-        args.num_runs = num_runs
-        args.ping_every = ping_every
-        args.resume_runs = resume_runs
-        args.config = config
+        args.config = 'default'
         args.params = params
 
-    # From planet.scripts.train.main
-    experiment = planet.training.Experiment(
-        args.logdir,
-        process_fn=functools.partial(planet_process_fn, args=args),
-        num_runs=args.num_runs,
-        ping_every=args.ping_every,
-        resume_runs=args.resume_runs)
-    for run in experiment:
-        for unused_score in run:
-            pass
+    for score in planet_process(args.logdir, args):
+        pass
+    logger.info('Run completed.')
 
 
 def habitat_env_ctor(action_repeat: int, min_length: int, max_length: int) -> gym.Env:
@@ -127,16 +111,6 @@ def create_tf_session(debugger: bool = False) -> tf.Session:
     return sess
 
 
-class PlanetRun(planet.training.running.Run):
-    def _create_logger(self) -> Any:
-        run_name = self._logdir and os.path.basename(self._logdir)
-
-        def _patch(record: Dict[str, Any]) -> None:
-            record['message'] = 'Worker {} run {}: {}'.format(self._worker_name, run_name, record['message'])
-
-        return logger.patch(_patch)
-
-
 class PlanetTrainer(planet.training.Trainer):
     def iterate(self, max_step: Any = None, sess: Any = None) -> Generator[Any, None, None]:
         """Simple patch to replace tf session"""
@@ -163,7 +137,5 @@ def tf_print(*args: Any) -> tf.Tensor:
 tasks_lib.habitat = planet_habitat_task  # type: ignore
 planet.control.wrappers.print = logger.info  # type: ignore
 planet.training.utility.print = logger.info  # type: ignore
-planet.training.running.print = logger.info  # type: ignore
-planet.training.running.Run = PlanetRun  # type: ignore
 planet.training.trainer.Trainer = PlanetTrainer  # type: ignore
 tf.print = tf_print

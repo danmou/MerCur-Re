@@ -2,48 +2,42 @@ main.base_logdir = 'logs'
 logging.mute = ['matplotlib', 'PIL']
 
 ### Planet ###
-# Basic
-planet.num_runs = 1
-planet.ping_every = 0
-planet.resume_runs = False
-planet.config = 'default'
-
 # Task
-planet.params.tasks = ['habitat']
-planet.params.isolate_envs = 'none'  # Don't change
-planet.params.action_repeat = 1
-planet.params.max_task_length = 500  # Maximum sequence length
-planet.params.gradient_heads = ['image', 'goal', 'reward']
-planet.params.train_action_noise = 0.3
+planet.tasks = ['habitat']
+planet.isolate_envs = 'none'  # Don't change
+planet.action_repeat = 1
+planet.max_task_length = 500  # Maximum sequence length
+planet.gradient_heads = ['image', 'goal', 'reward']
+planet.train_action_noise = 0.3
 
 # Schedule
-planet.params.num_seed_episodes = 20
-planet.params.train_collect_every = 1  # epochs per training data collection
-planet.params.num_train_episodes = 5  # training episodes per data collection
-planet.params.test_collect_every = 2  # epochs per test data collection
-planet.params.num_test_episodes = 10  # episodes per test data collection (these are also used for evaluation)
-planet.params.train_steps = 100  # training batches per epoch
-planet.params.test_steps = 1  # test steps per epoch
-planet.params.max_epochs = 200  # maximum number of epochs
+planet.num_seed_episodes = 20
+planet.train_collect_every = 1  # epochs per training data collection
+planet.num_train_episodes = 5  # training episodes per data collection
+planet.test_collect_every = 2  # epochs per test data collection
+planet.num_test_episodes = 10  # episodes per test data collection (these are also used for evaluation)
+planet.train_steps = 100  # training batches per epoch
+planet.test_steps = 1  # test steps per epoch
+planet.max_epochs = 200  # maximum number of epochs
 
 # Losses
-planet.params.divergence_scale = 1.0
-planet.params.image_loss_scale = 1.0
-planet.params.reward_loss_scale = 10.0
-planet.params.goal_loss_scale = 10.0
+planet.divergence_scale = 1.0
+planet.image_loss_scale = 1.0
+planet.reward_loss_scale = 10.0
+planet.goal_loss_scale = 10.0
 
 # Model complexity
-planet.params.model_size = 200  # belief_size, embed_size
-planet.params.state_size = 30
-planet.params.num_layers = 1  # used for reward and goal prediction
-planet.params.num_units = 100  # used for reward and goal prediction
+planet.model_size = 200  # belief_size, embed_size
+planet.state_size = 30
+planet.num_layers = 1  # used for reward and goal prediction
+planet.num_units = 100  # used for reward and goal prediction
 
 # Planner
-planet.params.planner = 'cem'
-planet.params.planner_horizon = 12
-planet.params.planner_iterations = 10
-planet.params.planner_amount = 1000  # number of action sequence samples per iteration
-planet.params.planner_topk = 100  # number of best samples to use as basis for next iteration
+planet.planner = 'cem'
+planet.planner_horizon = 12
+planet.planner_iterations = 10
+planet.planner_amount = 1000  # number of action sequence samples per iteration
+planet.planner_topk = 100  # number of best samples to use as basis for next iteration
 
 # TF options
 planet.tf.options.log_device_placement = False

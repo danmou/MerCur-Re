@@ -4,5 +4,5 @@ method: grid
 #  name: val_loss
 #  goal: minimize
 parameters:
-  planet.params.max_task_length:
+  planet.max_task_length:
     values: [5, 10, 15, 20, 30, 50]

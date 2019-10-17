@@ -1,21 +1,21 @@
 program: run.py
 method: random
 parameters:
-  planet.params.max_epochs:
+  planet.max_epochs:
     value: 60
-  planet.params.planner_horizon:
+  planet.planner_horizon:
     distribution: q_log_uniform
     min: 1.6  # 5
     max: 3.92  # 50
-  planet.params.planner_iterations:
+  planet.planner_iterations:
     distribution: q_log_uniform
     min: 1.6  # 5
     max: 3.92  # 50
-  planet.params.planner_amount:
+  planet.planner_amount:
     distribution: q_log_uniform
     min: 4.61  # 100
     max: 9.2103  # 5e3
-  planet.params.planner_topk:
+  planet.planner_topk:
     distribution: q_log_uniform
     min: 2.3  # 10
     max: 6.215  # 500

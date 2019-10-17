@@ -2,26 +2,26 @@ include 'configs/default.gin'
 
 main.base_logdir = 'debug_logs'
 
-planet.params.action_repeat = 5
-planet.params.num_seed_episodes = 1
-planet.params.train_steps = 2
-planet.params.test_steps = 2
-planet.params.max_epochs = 2  # Maximum number of epochs
-planet.params.max_task_length = 10  # Maximum sequence length
-planet.params.train_collect_every = 1  # epochs per training data collection
-planet.params.num_train_episodes = 1  # training episodes per data collection
-planet.params.test_collect_every = 1  # epochs per test data collection
-planet.params.num_test_episodes = 1  # episodes per test data collection (these are also used for evaluation)
-planet.params.model_size = 10
-planet.params.state_size = 5
-planet.params.num_layers = 1
-planet.params.num_units = 10
-planet.params.batch_shape = [2, 5]  # [batch_size, min_seq_length]
-planet.params.loader_every = 5
-planet.params.loader_window = 2
-planet.params.planner_amount = 5
-planet.params.planner_topk = 2
-planet.params.planner_iterations = 2
+planet.action_repeat = 5
+planet.num_seed_episodes = 1
+planet.train_steps = 2
+planet.test_steps = 2
+planet.max_epochs = 2  # Maximum number of epochs
+planet.max_task_length = 10  # Maximum sequence length
+planet.train_collect_every = 1  # epochs per training data collection
+planet.num_train_episodes = 1  # training episodes per data collection
+planet.test_collect_every = 1  # epochs per test data collection
+planet.num_test_episodes = 1  # episodes per test data collection (these are also used for evaluation)
+planet.model_size = 10
+planet.state_size = 5
+planet.num_layers = 1
+planet.num_units = 10
+planet.batch_shape = [2, 5]  # [batch_size, min_seq_length]
+planet.loader_every = 5
+planet.loader_window = 2
+planet.planner_amount = 5
+planet.planner_topk = 2
+planet.planner_iterations = 2
 
 # planet.tf.options.log_device_placement = True
 planet.tf.gpu_options.visible_device_list = '0'
