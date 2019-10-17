@@ -123,6 +123,7 @@ class Habitat:
             return getattr(self._env, name)
 
     __instance = None
+    __config = None
 
     def __init__(self,
                  max_steps: Optional[int] = None,
@@ -132,21 +133,23 @@ class Habitat:
                  image_key: str = 'rgb',
                  goal_key: str = 'pointgoal_with_gps_compass',
                  reward_function: Type[RewardFunction] = RewardFunction) -> None:
-        self.config = get_config(max_steps, task, dataset, gpu_id)
+        Habitat.__config = Habitat.__config or get_config(max_steps, task, dataset, gpu_id)
         self.image_key = image_key
         self.goal_key = goal_key
         self.reward_function = reward_function
         self.__create_instance()
 
     def __create_instance(self) -> None:
+        config = Habitat.__config
+        assert config
         if not Habitat.__instance:
-            wandb.config.update({'habitat_config': self.config})
+            wandb.config.update({'habitat_config': config})
         else:
             logger.debug("Deleting current instance of Habitat before reinit.")
             self.close()
         logger.debug("Creating Habitat instance.")
         with capture_output('habitat_sim'):
-            Habitat.__instance = Habitat.__Habitat(self.config, self.image_key, self.goal_key, self.reward_function)
+            Habitat.__instance = Habitat.__Habitat(config, self.image_key, self.goal_key, self.reward_function)
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self.__instance, name)
