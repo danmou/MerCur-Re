@@ -2,7 +2,6 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-import functools
 import os.path
 from typing import Any, Dict, Generator, List, cast
 
@@ -16,7 +15,7 @@ import tensorflow as tf
 from loguru import logger
 from planet.scripts.configs import tasks_lib
 from planet.scripts.tasks import Task as PlanetTask
-from planet.scripts.train import process as planet_process
+from planet.scripts.train import process as planet_train
 from tensorflow.python import debug as tf_debug
 
 from .environments import Habitat, wrappers
@@ -25,20 +24,20 @@ from .util import capture_output
 
 @gin.configurable('planet')
 class PlanetParams(planet.tools.AttrDict):
-    pass
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        if not self.get('tasks'):
+            self.tasks = ['habitat']
 
 
-def run(logdir: str) -> None:
+def train(logdir: str) -> None:
     params = PlanetParams()
-    if not params.get('tasks'):
-        params.tasks = ['habitat']
     args = planet.tools.AttrDict()
     with args.unlocked:
-        args.logdir = logdir
         args.config = 'default'
         args.params = params
 
-    for score in planet_process(args.logdir, args):
+    for score in planet_train(logdir, args):
         pass
     logger.info('Run completed.')
 

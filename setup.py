@@ -61,5 +61,5 @@ setup(
         f'https://github.com/facebookresearch/habitat-api/tarball/master#egg=habitat',
         f'https://github.com/deepmind/dm_control/tarball/master#egg=dm_control',
     ],
-    entry_points={'console_scripts': ['thesis=project.main:main_command']},
+    entry_points={'console_scripts': ['thesis=project.cli:cli']},
 )

@@ -9,7 +9,7 @@ import string
 import sys
 import time
 from multiprocessing import Process
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 import click
 import wandb
@@ -29,7 +29,8 @@ def run_agent(sweep_id: str, gpu: str, config: str, verbosity: str = 'INFO') -> 
             wandb.init()
             extra_options = tuple(f'{name}={val}' for name, val in wandb.config.user_items())
             print(f'Job on GPU {gpu} starting with options:\n' + '\n'.join(extra_options))
-            main_configure(config, extra_options, verbosity, catch_exceptions=False, name=gpu)
+            with main_configure(config, extra_options, verbosity, catch_exceptions=False, extension=gpu) as main:
+                main.train()
         except Exception as e:
             # An exception in this function would cause an infinite hang
             print(f'Job on GPU {gpu} failed with exception of type {type(e).__name__}')
@@ -41,8 +42,8 @@ def run_agent(sweep_id: str, gpu: str, config: str, verbosity: str = 'INFO') -> 
 class Config:
     def __init__(self, file: str) -> None:
         self._file = file
-        self._modified_time = None
-        self.dict = None
+        self._modified_time: Optional[float] = None
+        self.dict: Optional[Dict[str, Any]] = None
         self.update()
 
     def update(self) -> bool:
@@ -50,12 +51,14 @@ class Config:
         if mtime != self._modified_time:
             with open(self._file) as conf:
                 self.dict = yaml.load(conf, Loader=yaml.FullLoader)
+            assert self.dict is not None
             self.dict['controller'] = {'type': 'local'}
             self._modified_time = mtime
             return True
         return False
 
     def check_params(self, params: Dict[str, Any]) -> bool:
+        assert self.dict is not None
         for condition in self.dict.get('conditions', []):
             if not eval(condition, {}, {name.split('.')[-1]: val['value'] for name, val in params.items()}):
                 return False
@@ -127,7 +130,7 @@ class SweepController:
         params = self.tuner.search()
         while not self.config.check_params(params):
             params = self.tuner.search()
-        return params
+        return cast(Dict[str, Any], params)
 
     def can_schedule(self) -> bool:
         schedule = [p['id'] for p in self.tuner._controller.get('schedule', [])]
@@ -176,9 +179,9 @@ class SweepController:
 @click.option('--id', help='existing sweep id to use (if not specified, a new sweep will be created)')
 @click.option('--gpus', envvar='CUDA_VISIBLE_DEVICES')
 @click.option('--verbosity', default='WARNING')
-def main(sweep_config: str, base_config: str, id: Optional[str], gpus: str, verbosity: str) -> None:
+def cli(sweep_config: str, base_config: str, id: Optional[str], gpus: str, verbosity: str) -> None:
     SweepController(sweep_config, base_config, id, gpus).run(verbosity)
 
 
 if __name__ == '__main__':
-    main()
+    cli()

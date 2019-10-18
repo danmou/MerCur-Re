@@ -7,7 +7,7 @@ import sys
 
 sys.path.append('planet')
 
-from project.main import main_command
+from project.cli import cli
 
 if __name__ == '__main__':
-    main_command()
+    cli()
