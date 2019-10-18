@@ -2,6 +2,8 @@
 #
 # (C) 2019, Daniel Mouritzen
 
+from pathlib import Path
+from shutil import copyfile
 from typing import Any, Dict, Optional, Tuple, Type, TypeVar, Union
 
 import gin
@@ -176,6 +178,8 @@ def get_config(max_steps: Optional[Union[int, float]],
         task = f'{get_config_dir()}/habitat/tasks/{task}.yaml'
     if not dataset.endswith('.yaml'):
         dataset = f'{get_config_dir()}/habitat/datasets/{dataset}.yaml'
+    copyfile(task, Path(wandb.run.dir) / 'task.yaml')
+    copyfile(dataset, Path(wandb.run.dir) / 'dataset.yaml')
     config = habitat.get_config([task, dataset], opts)
     config.defrost()
     config.TASK.SUCCESS = habitat.Config()

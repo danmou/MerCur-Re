@@ -18,9 +18,6 @@ from tensorflow.python import logging as tf_logging
 # Must be before PlaNet import
 tf.contrib._warning = None
 
-# Remove default loguru logger
-logger.remove()
-
 
 @gin.configurable('logging', whitelist=['mute'])
 class InterceptHandler(logging.Handler):
@@ -47,6 +44,9 @@ class InterceptHandler(logging.Handler):
 
 
 def init_logging(verbosity: str, logdir: Union[str, Path]) -> None:
+    # Remove default loguru logger
+    logger.remove()
+
     # Disable TF's default logging handler
     logging.getLogger('tensorflow').handlers = []
 
