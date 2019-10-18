@@ -30,10 +30,14 @@ class Success(habitat.Measure):
     def _get_uuid(self, *args: Any, **kwargs: Any) -> str:
         return "success"
 
-    def reset_metric(self, *args: Any, episode, **kwargs: Any) -> None:
+    def reset_metric(self, *args: Any, **kwargs: Any) -> None:
         self._metric = None
 
-    def update_metric(self, *args: Any, episode: NavigationEpisode, task: habitat.EmbodiedTask, **kwargs: Any) -> None:
+    def update_metric(self,  # type: ignore
+                      *args: Any,
+                      episode: NavigationEpisode,
+                      task: habitat.EmbodiedTask,
+                      **kwargs: Any) -> None:
         current_position = self._sim.get_agent_state().position.tolist()
         distance_to_target = self._sim.geodesic_distance(current_position, episode.goals[0].position)
 
@@ -92,7 +96,7 @@ class Habitat:
                 metrics['collisions'] = metrics['collisions']['count']
             return metrics
 
-        def step(self, action: int) -> ObsTuple:
+        def step(self, action: int) -> ObsTuple:  # type: ignore
             self._previous_action = action
             obs, reward, done, info = super().step(action)
             obs = self._update_keys(obs)

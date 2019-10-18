@@ -6,7 +6,7 @@ import inspect
 import logging
 import sys
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import gin
 import tensorflow as tf
@@ -56,7 +56,7 @@ def init_logging(verbosity: str, logdir: Union[str, Path]) -> None:
     # Log to stdout and logfiles
     trace_logfile = Path(logdir) / 'trace.log'
     info_logfile = Path(logdir) / f'info.log'
-    kwargs = dict(backtrace=True, diagnose=True)
+    kwargs: Dict[str, Any] = dict(backtrace=True, diagnose=True)
     logger.add(trace_logfile, level='TRACE', **kwargs)
     kwargs['format'] = '<level>[{level[0]}] {time:HH:mm:ss}</level> {message}'
     logger.add(info_logfile, level='INFO', **kwargs)

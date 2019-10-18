@@ -7,6 +7,7 @@ from typing import Any, Dict, Generator, List, cast
 
 import gin
 import gym
+import numpy as np
 import planet.control.wrappers as planet_wrappers
 import planet.tools
 import planet.training
@@ -111,7 +112,7 @@ def create_tf_session(debugger: bool = False) -> tf.Session:
 
 
 class PlanetTrainer(planet.training.Trainer):
-    def iterate(self, max_step: Any = None, sess: Any = None) -> Generator[Any, None, None]:
+    def iterate(self, max_step: Any = None, sess: Any = None) -> Generator[np.float32, None, None]:
         """Simple patch to replace tf session"""
         sess = create_tf_session()
         for score in super().iterate(max_step, sess):

@@ -2,7 +2,7 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import Any, Dict, Tuple, Optional, cast
+from typing import Any, Dict, Tuple, cast
 
 import gin
 import gym.spaces
