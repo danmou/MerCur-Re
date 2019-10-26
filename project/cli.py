@@ -75,3 +75,21 @@ def train_command(config: str,
     """Run training."""
     with main_configure(config, extra_options, verbosity, debug, data=data) as main:
         main.train()
+
+
+@cli.command(name='evaluate')
+@with_global_options
+@click.option('-m', '--model',
+              help='Model checkpoint to load. Can be a dir or a specific file, absolute or relative to the logdir')
+@click.option('-n', '--num-episodes', type=int, default=10, help='Number of episodes to evaluate on')
+def evaluate_command(config: str,
+                     data: Optional[str],
+                     verbosity: str,
+                     debug: bool,
+                     extra_options: Tuple[str, ...],
+                     model: Optional[str],
+                     num_episodes: int,
+                     ) -> None:
+    """Evaluate checkpoint."""
+    with main_configure(config, extra_options, verbosity, debug, data=data) as main:
+        main.evaluate(model, num_episodes)

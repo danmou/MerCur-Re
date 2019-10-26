@@ -11,7 +11,7 @@ SIMULATOR:
   RGB_SENSOR:
     WIDTH: 64
     HEIGHT: 64
-    HFOV: 90  # degrees
+    HFOV: &camera_fov 90  # degrees
     POSITION: [0, 1.25, 0]  # [x, y, z] in meters
 
 TASK:
@@ -32,3 +32,15 @@ TASK:
     TYPE: 'Collisions'
   DISTANCE_TO_GOAL:
     TYPE: 'DistanceToGoal'
+  TOP_DOWN_MAP:
+    TYPE: 'TopDownMap'
+    MAP_PADDING: 3
+    NUM_TOPDOWN_MAP_SAMPLE_POINTS: 20000
+    MAP_RESOLUTION: 2500
+    DRAW_SOURCE_AND_TARGET: True
+    DRAW_BORDER: True
+    DRAW_SHORTEST_PATH: True
+    FOG_OF_WAR:
+      DRAW: True
+      VISIBILITY_DIST: 5.0
+      FOV: *camera_fov

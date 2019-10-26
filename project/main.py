@@ -15,7 +15,7 @@ from loguru import logger
 from tensorflow.python.util import deprecation
 
 from project.logging import init_logging
-from project.planet import train
+from project.execution import evaluate, train
 
 
 @gin.configurable('main', whitelist=['base_logdir'])
@@ -43,7 +43,7 @@ class Main:
         wandb.config.update({name.rsplit('.', 1)[-1]: conf
                              for (_, name), conf in gin.config._CONFIG.items()
                              if name is not None})
-        wandb.config.update({'cuda_gpus': os.environ['CUDA_VISIBLE_DEVICES']})
+        wandb.config.update({'cuda_gpus': os.environ.get('CUDA_VISIBLE_DEVICES')})
         self.logdir = logdir
         self.debug = debug
         self.catch_exceptions = catch_exceptions
@@ -64,6 +64,9 @@ class Main:
             wandb.save(f'{self.logdir}/checkpoint', policy='end')
             wandb.save(f'{self.logdir}/*.ckpt*', policy='end')
 
+    def evaluate(self, checkpoint: Optional[str], num_episodes: int) -> None:
+        self._catch(lambda: evaluate(str(self.logdir), checkpoint, num_episodes))
+
 
 @contextlib.contextmanager
 def main_configure(config: str,
@@ -78,6 +81,10 @@ def main_configure(config: str,
     gin.parse_config_files_and_bindings([config], extra_options)
     with gin.unlock_config():
         gin.bind_parameter('main.base_logdir', str(Path(gin.query_parameter('main.base_logdir')).absolute()))
+    with open(Path(wandb.run.dir) / 'config.gin', 'w') as f:
+        f.write(open(config).read())
+        f.write('\n# Extra options\n')
+        f.write('\n'.join(extra_options))
     tempdir = None
     try:
         if data:

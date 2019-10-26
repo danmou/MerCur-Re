@@ -16,12 +16,11 @@ import tensorflow as tf
 from loguru import logger
 from planet.scripts.configs import tasks_lib
 from planet.scripts.tasks import Task as PlanetTask
-from planet.scripts.train import process as planet_train
 from planet.tools import AttrDict
 from tensorflow.python import debug as tf_debug
 
-from .environments import habitat, wrappers
-from .util import Timer, capture_output
+from project.environments import habitat, wrappers
+from project.util import Timer, capture_output
 
 
 @gin.configurable('planet')
@@ -30,18 +29,6 @@ class PlanetParams(AttrDict):
         super().__init__(*args, **kwargs)
         if not self.get('tasks'):
             self.tasks = ['habitat']
-
-
-def train(logdir: str) -> None:
-    params = PlanetParams()
-    args = AttrDict()
-    with args.unlocked:
-        args.config = 'default'
-        args.params = params
-
-    for score in planet_train(logdir, args):
-        pass
-    logger.info('Run completed.')
 
 
 def habitat_env_ctor(*params: Tuple[str, Any]) -> gym.Env:

@@ -220,3 +220,4 @@ data
 debug_logs/
 logs/
 wandb/
+*.mp4
