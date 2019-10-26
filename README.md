@@ -79,3 +79,21 @@ python2 download_mp.py --task habitat -o .
 unzip v1/tasks/mp3d_habitat.zip -x README.txt -d scene_datasets/
 rm -rf v1/ download_mp.py
 ```
+
+#### Modifying and analyzing datasets using `jq`
+Extracting the first episode from dataset and saving as new dataset:
+```bash
+gzip -dc data/datasets/pointnav/habitat-test-scenes/v1/train/train.json.gz | jq "{episodes: [.episodes[0]]}" | gzip -c > data/datasets/pointnav/habitat-test-scenes/v1/train/single.json.gz
+```
+Extracting episodes from a specific environment and saving as new dataset:
+```bash
+split=val; gzip -dc data/datasets/pointnav/habitat-test-scenes/v1/${split}/${split}.json.gz | jq '{episodes: [.episodes[] | select(.scene_id | contains("castle"))]}' | gzip > data/datasets/pointnav/habitat-test-scenes/v1/${split}/${split}_castle.json.gz
+```
+Calculating 5th, 50th and 95th percentiles of geodesic distances:
+```bash
+split=val; gzip -dc data/datasets/pointnav/gibson/v1/${split}/${split}.json.gz | jq '[.episodes[].info.geodesic_distance] | sort | .[length*(0.05, 0.5, 0.95) | round]'
+```
+Estimating percentiles for large dataset:
+```bash
+gzip -dc $(ls data/datasets/pointnav/gibson/v1/train/content/*.json.gz | shuf | head -n 10) | jq '.episodes[].info.geodesic_distance' | jq --slurp 'sort | .[length*(0.05, 0.5, 0.95) | round]'
+```
