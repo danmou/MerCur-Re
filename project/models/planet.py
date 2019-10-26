@@ -37,7 +37,7 @@ def habitat_env_ctor(*params: Tuple[str, Any]) -> gym.Env:
     min_duration = params['min_duration']
     max_duration = params['max_duration']
     assert min_duration <= max_duration, f'{min_duration}>{max_duration}!'
-    logger.debug(f'Collecting episodes between {min_duration} and {max_duration} steps in length.')
+    logger.trace(f'Collecting episodes between {min_duration} and {max_duration} steps in length.')
     env = habitat.Habitat(**params)
     for Wrapper, params in wrappers:
         env = Wrapper(env, **params)

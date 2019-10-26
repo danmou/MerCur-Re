@@ -71,7 +71,8 @@ class Habitat(habitat.RLEnv):
         self._capture_video = capture_video
         self._rgb_frames: List[np.ndarray] = []
 
-        super().__init__(config)
+        with capture_output('habitat_sim'):
+            super().__init__(config)
         self.observation_space: gym.spaces.Dict = gym.spaces.Dict(self._update_keys(self._env.observation_space.spaces))
         self.action_space = self._env.action_space
 
@@ -121,7 +122,9 @@ class Habitat(habitat.RLEnv):
         self._previous_action = None
         self._reward_function.reset()
         self._rgb_frames = []
-        return self._update_keys(super().reset())
+        with capture_output('habitat_sim'):
+            obs = super().reset()
+        return self._update_keys(obs)
 
     _ObsOrDict = TypeVar('_ObsOrDict', Observations, Dict['str', Any])
 
@@ -133,9 +136,9 @@ class Habitat(habitat.RLEnv):
         obs.update(obs_dict)
         return obs
 
-    # def close(self) -> None:
-    #     with capture_output('habitat_sim'):
-    #         self._env.close()
+    def close(self) -> None:
+        with capture_output('habitat_sim'):
+            self._env.close()
 
     @measure_time()
     def save_video(self, file: Union[str, Path], fps: int = 20) -> None:
@@ -207,7 +210,7 @@ class VectorHabitat(VectorEnv):
                  env_ctor: Callable[..., gym.Env],
                  params: Dict[str, Any],
                  auto_reset_done: bool = False) -> None:
-        super().__init__(env_ctor, [tuple(params.items())], auto_reset_done=auto_reset_done)
+        super().__init__(env_ctor, [tuple(params.items())], auto_reset_done=auto_reset_done, multiprocessing_start_method='fork')
         self.observation_space = self.observation_spaces[0]
         self.action_space = self.action_spaces[0]
 
