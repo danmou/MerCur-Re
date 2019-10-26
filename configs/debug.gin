@@ -2,7 +2,6 @@ include 'configs/default.gin'
 
 main.base_logdir = 'debug_logs'
 
-planet.action_repeat = 5
 planet.num_seed_episodes = 1
 planet.train_steps = 2
 planet.test_steps = 2

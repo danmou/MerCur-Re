@@ -5,7 +5,6 @@ logging.mute = ['matplotlib', 'PIL']
 # Task
 planet.tasks = ['habitat']
 planet.isolate_envs = 'none'  # Don't change
-planet.action_repeat = 1
 planet.max_task_length = 500  # Maximum sequence length
 planet.gradient_heads = ['image', 'goal', 'reward']
 planet.train_action_noise = 0.3
@@ -49,7 +48,6 @@ planet.planner_topk = 100  # number of best samples to use as basis for next ite
 # TF options
 planet.tf.options.log_device_placement = False
 # planet.tf.options.device_count = {'GPU': 0, 'CPU': 4}
-planet.tf.options.inter_op_parallelism_threads = 1  # Don't change
 planet.tf.debugger = False
 
 # GPU options
@@ -59,8 +57,12 @@ planet.tf.gpu_options.visible_device_list = '1'
 
 ### Habitat ###
 # Basic
-DiscreteWrapper.sample = False
-AutomaticStop.enable = True
+planet_habitat_task.wrappers = [@automatic_stop(),
+                                @action_repeat(),
+                                @discrete_wrapper(),
+                                @minimum_duration()]
+discrete_wrapper.sample = False
+automatic_stop.enable = True
 Habitat.task = 'pointnav'
 Habitat.dataset = 'habitat_test'
 Habitat.gpu_id = 0
@@ -68,12 +70,12 @@ Habitat.image_key = 'rgb'
 Habitat.goal_key = 'pointgoal_with_gps_compass'
 
 # Reward
-DenseReward.slack_reward = -0.01
-DenseReward.success_reward = 10.0
-DenseReward.distance_scaling = 1.0
-OptimalPathLengthReward.scaling = 1.0
-CollisionPenalty.scaling = 1.0
-ObstacleDistancePenalty.threshold = 0.5
-ObstacleDistancePenalty.scaling = 1.0
+dense_reward.slack_reward = -0.01
+dense_reward.success_reward = 10.0
+dense_reward.distance_scaling = 1.0
+optimal_path_length_reward.scaling = 1.0
+collision_penalty.scaling = 1.0
+obstacle_distance_penalty.threshold = 0.5
+obstacle_distance_penalty.scaling = 1.0
 Habitat.reward_function = @combine_rewards()
-combine_rewards.rewards = [@DenseReward, @CollisionPenalty, @ObstacleDistancePenalty]
+combine_rewards.rewards = [@dense_reward(), @collision_penalty(), @obstacle_distance_penalty()]

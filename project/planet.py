@@ -3,7 +3,7 @@
 # (C) 2019, Daniel Mouritzen
 
 import os.path
-from typing import Any, Dict, Generator, List, cast
+from typing import Any, Callable, Dict, Generator, List, Tuple, Type, cast
 
 import gin
 import gym
@@ -17,14 +17,15 @@ from loguru import logger
 from planet.scripts.configs import tasks_lib
 from planet.scripts.tasks import Task as PlanetTask
 from planet.scripts.train import process as planet_train
+from planet.tools import AttrDict
 from tensorflow.python import debug as tf_debug
 
-from .environments import Habitat, wrappers
-from .util import capture_output
+from .environments import habitat, wrappers
+from .util import Timer, capture_output
 
 
 @gin.configurable('planet')
-class PlanetParams(planet.tools.AttrDict):
+class PlanetParams(AttrDict):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         if not self.get('tasks'):
@@ -33,7 +34,7 @@ class PlanetParams(planet.tools.AttrDict):
 
 def train(logdir: str) -> None:
     params = PlanetParams()
-    args = planet.tools.AttrDict()
+    args = AttrDict()
     with args.unlocked:
         args.config = 'default'
         args.params = params
@@ -43,70 +44,83 @@ def train(logdir: str) -> None:
     logger.info('Run completed.')
 
 
-def habitat_env_ctor(action_repeat: int, min_length: int, max_length: int) -> gym.Env:
-    assert min_length <= max_length, f'{min_length}>{max_length}!'
-    logger.debug(f'Collecting episodes between {min_length} and {max_length} steps in length.')
-    env = Habitat(max_steps=max_length*action_repeat)
-    env = wrappers.AutomaticStop(env, minimum_duration=min_length)
-    env = planet_wrappers.ActionRepeat(env, action_repeat)
-    env = wrappers.DiscreteWrapper(env)
-    env = wrappers.MinimumDuration(env, min_length)
+def habitat_env_ctor(*params: Tuple[str, Any]) -> gym.Env:
+    params = dict(params)
+    wrappers = params.pop('wrappers')
+    min_duration = params['min_duration']
+    max_duration = params['max_duration']
+    assert min_duration <= max_duration, f'{min_duration}>{max_duration}!'
+    logger.debug(f'Collecting episodes between {min_duration} and {max_duration} steps in length.')
+    env = habitat.Habitat(**params)
+    for Wrapper, params in wrappers:
+        env = Wrapper(env, **params)
     return env
 
 
-def planet_habitat_task(config: planet.tools.AttrDict, params: planet.tools.AttrDict) -> PlanetTask:
+@gin.configurable(whitelist=['wrappers'])
+def planet_habitat_task(config: AttrDict,
+                        params: AttrDict,
+                        wrappers: List[Tuple[Type[wrappers.Wrapper],
+                                       Callable[[Dict[str, Any]], Dict[str, Any]]]] = gin.REQUIRED,
+                        ) -> PlanetTask:
     action_repeat = params.get('action_repeat', 1)
     max_length = params.max_task_length
     state_components = ['reward']
     observation_components = ['image', 'goal']
     metrics = ['success', 'spl', 'path_length', 'optimal_path_length', 'remaining_distance', 'collisions']
-    env_ctor = planet.tools.bind(
-        habitat_env_ctor, action_repeat, config.batch_shape[1], max_length)
+    params = {'action_repeat': action_repeat,
+              'min_duration': config.batch_shape[1],
+              'max_duration': max_length,
+              'capture_video': False}
+    params['wrappers'] = [(Wrapper, kwarg_fn(params)) for Wrapper, kwarg_fn in wrappers]
+    params.update(habitat.get_config(max_steps=max_length*action_repeat))
+    env_ctor = planet.tools.bind(habitat.VectorHabitat, habitat_env_ctor, params)
     return PlanetTask('habitat', env_ctor, max_length, state_components, observation_components, metrics)
 
 
 @gin.configurable('planet.tf.options')
-class PlanetTFOptions(planet.tools.AttrDict):
+class PlanetTFOptions(AttrDict):
     pass
 
 
 @gin.configurable('planet.tf.gpu_options')
-class PlanetTFGPUOptions(planet.tools.AttrDict):
+class PlanetTFGPUOptions(AttrDict):
     pass
 
 
 @gin.configurable('planet.tf')
 def create_tf_session(debugger: bool = False) -> tf.Session:
-    options = PlanetTFOptions()
-    gpu_options = PlanetTFGPUOptions()
-    if gpu_options:
-        devices = [int(d) for d in gpu_options.get('visible_device_list', '').split(',')]
-        if devices:
-            num_visible_devices = len(os.environ.get('CUDA_VISIBLE_DEVICES', '').split(','))
-            max_d = max(devices)
-            min_d = min(devices)
-            assert max_d - min_d < num_visible_devices, (f'Config specifies devices {devices} for planet, but only '
-                                                         f'{num_visible_devices} devices are visible to CUDA.')
-            if max_d >= num_visible_devices:
-                shift = max_d - num_visible_devices + 1
-                logger.warning(f'Config specifies devices {devices} for planet, but only {num_visible_devices} devices '
-                               f'are visible to CUDA. Shifting device list down by {shift} to compensate.')
-                devices = [d - shift for d in devices]
-                with gpu_options.unlocked:
-                    gpu_options.visible_device_list = ','.join([str(d) for d in devices])
-        with options.unlocked:
-            options.gpu_options = tf.GPUOptions(**gpu_options)
-    config = tf.ConfigProto(**options)
-    with capture_output('tensorflow'):
-        try:
-            sess = tf.Session('local', config=config)
-        except tf.errors.NotFoundError:
-            sess = tf.Session(config=config)
-        if debugger:
-            sess = cast(tf.Session, tf_debug.TensorBoardDebugWrapperSession(sess,
-                                                                            'localhost:6064',
-                                                                            send_traceback_and_source_code=False))
-    logger.debug('Initialized TF')
+    with Timer() as t:
+        options = PlanetTFOptions()
+        gpu_options = PlanetTFGPUOptions()
+        if gpu_options:
+            devices = [int(d) for d in gpu_options.get('visible_device_list', '').split(',') if d]
+            if devices:
+                num_visible_devices = len(os.environ.get('CUDA_VISIBLE_DEVICES', '').split(','))
+                max_d = max(devices)
+                min_d = min(devices)
+                assert max_d - min_d < num_visible_devices, (f'Config specifies devices {devices} for planet, but only '
+                                                             f'{num_visible_devices} devices are visible to CUDA.')
+                if max_d >= num_visible_devices:
+                    shift = max_d - num_visible_devices + 1
+                    logger.warning(f'Config specifies devices {devices} for planet, but only {num_visible_devices} devices '
+                                   f'are visible to CUDA. Shifting device list down by {shift} to compensate.')
+                    devices = [d - shift for d in devices]
+                    with gpu_options.unlocked:
+                        gpu_options.visible_device_list = ','.join([str(d) for d in devices])
+            with options.unlocked:
+                options.gpu_options = tf.GPUOptions(**gpu_options)
+        config = tf.ConfigProto(**options)
+        with capture_output('tensorflow'):
+            try:
+                sess = tf.Session('local', config=config)
+            except tf.errors.NotFoundError:
+                sess = tf.Session(config=config)
+            if debugger:
+                sess = cast(tf.Session, tf_debug.TensorBoardDebugWrapperSession(sess,
+                                                                                'localhost:6064',
+                                                                                send_traceback_and_source_code=False))
+    logger.debug(f'Initialized TF in {t.interval:.3g}s')
     logger.trace(f'Config:\n{gin.operative_config_str()}')
     return sess
 

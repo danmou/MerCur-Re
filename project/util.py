@@ -6,10 +6,11 @@ import ctypes
 import os
 import sys
 import tempfile
+import time
 from contextlib import contextmanager
 from ctypes.util import find_library
 from pathlib import Path
-from typing import Generator, cast
+from typing import Any, Callable, Dict, Generator, Optional, Sequence, TypeVar, Union, cast
 
 from loguru import logger
 
@@ -47,3 +48,27 @@ def capture_output(name: str = 'output', level: str = 'TRACE') -> Generator[None
             record = {'name': name, 'function': '', 'line': ''}
             for line in temp_out.readlines():
                 logger.patch(lambda r: r.update(record)).log(level, line.rstrip())
+
+
+class Timer:
+    def __enter__(self) -> 'Timer':
+        self.start = time.perf_counter()
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        self.end = time.perf_counter()
+        self.interval = self.end - self.start
+
+
+T = TypeVar('T')
+
+
+def measure_time(log_fn: Callable[[str], None] = logger.debug) -> Callable[[T], T]:
+    def wrapper(fn: T) -> T:
+        def timed(*args: Any, **kwargs: Any) -> Any:
+            with Timer() as t:
+                result = fn(*args, **kwargs)
+            log_fn(f'Call to {fn.__name__} finished in {t.interval:.3g}s')
+            return result
+        return cast(T, timed)
+    return wrapper

@@ -2,19 +2,19 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import Any, Dict, Tuple, cast
+from typing import Any, Callable, Dict, Tuple, Type, cast
 
 import gin
 import gym.spaces
 import numpy as np
+import planet.control.wrappers as planet_wrappers
 from loguru import logger
-from planet.control.wrappers import Wrapper as PlanetWrapper
 
 Observations = Dict[str, np.ndarray]
 ObsTuple = Tuple[Observations, float, bool, Dict[str, Any]]  # obs, reward, done, info
 
 
-class Wrapper(PlanetWrapper):
+class Wrapper(planet_wrappers.Wrapper):
     """Simply a type-annotated version of planet_wrappers.Wrapper"""
     def step(self, action: int) -> ObsTuple:
         return cast(ObsTuple, super().step(action))
@@ -23,14 +23,13 @@ class Wrapper(PlanetWrapper):
         return cast(Observations, super().reset(**kwargs))
 
 
-@gin.configurable(whitelist=['sample'])
 class DiscreteWrapper(Wrapper):
     """
     Wraps a discrete action-space environment into a continuous control task.
     Inspired by https://github.com/piojanu/planet/blob/master/planet/control/wrappers.py#L731-L747
     """
 
-    def __init__(self, env: gym.Env, sample: bool = False) -> None:
+    def __init__(self, env: gym.Env, sample: bool) -> None:
         super().__init__(env)
         self._sample = sample
         self.action_space = gym.spaces.Box(low=-1, high=1,  # PlaNet returns numbers in this range
@@ -47,6 +46,11 @@ class DiscreteWrapper(Wrapper):
         else:
             act = np.argmax(action)
         return cast(ObsTuple, self.env.step(act))
+
+
+@gin.configurable(whitelist=['sample'])
+def discrete_wrapper(sample: bool = False) -> Tuple[Type[DiscreteWrapper], Callable[[Dict[str, Any]], Dict[str, Any]]]:
+    return DiscreteWrapper, lambda kwargs: {'sample': sample}
 
 
 class MinimumDuration(Wrapper):
@@ -73,10 +77,14 @@ class MinimumDuration(Wrapper):
         return cast(Observations, self.env.reset(**kwargs))
 
 
-@gin.configurable(whitelist=['enable'])
+@gin.configurable(whitelist=[])
+def minimum_duration() -> Tuple[Type[MinimumDuration], Callable[[Dict[str, Any]], Dict[str, Any]]]:
+    return MinimumDuration, lambda kwargs: {'duration': kwargs['min_duration']}
+
+
 class AutomaticStop(Wrapper):
     """Removes the stop action from the action space and triggers it automatically when the goal is reached."""
-    def __init__(self, env: gym.Env, enable: bool = False, minimum_duration: int = 0) -> None:
+    def __init__(self, env: gym.Env, enable: bool, minimum_duration: int = 0) -> None:
         super().__init__(env)
         self._enable = enable
         self._duration = minimum_duration
@@ -96,3 +104,13 @@ class AutomaticStop(Wrapper):
     def reset(self, **kwargs: Any) -> Observations:
         self._step = 0
         return cast(Observations, self.env.reset(**kwargs))
+
+
+@gin.configurable(whitelist=['enable'])
+def automatic_stop(enable: bool = False) -> Tuple[Type[AutomaticStop], Callable[[Dict[str, Any]], Dict[str, Any]]]:
+    return AutomaticStop, lambda kwargs: {'enable': enable, 'minimum_duration': kwargs['min_duration']}
+
+
+@gin.configurable(whitelist=[])
+def action_repeat() -> Tuple[Type[planet_wrappers.ActionRepeat], Callable[[Dict[str, Any]], Dict[str, Any]]]:
+    return planet_wrappers.ActionRepeat, lambda kwargs: {'amount': kwargs['action_repeat']}
