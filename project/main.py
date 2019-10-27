@@ -56,9 +56,9 @@ class Main:
             else:
                 func()
 
-    def train(self) -> None:
+    def train(self, initial_data: Optional[str]) -> None:
         try:
-            self._catch(lambda: train(str(self.logdir)))
+            self._catch(lambda: train(str(self.logdir), initial_data))
         finally:
             # Make sure all checkpoints get uploaded
             wandb.save(f'{self.logdir}/checkpoint', policy='end')

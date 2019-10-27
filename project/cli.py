@@ -66,15 +66,17 @@ def cli(ctx: click.Context) -> None:
 
 @cli.command(name='train')
 @with_global_options
+@click.option('--initial-data', help='Dataset to use instead of initial collection')
 def train_command(config: str,
                   data: Optional[str],
                   verbosity: str,
                   debug: bool,
-                  extra_options: Tuple[str, ...]
+                  extra_options: Tuple[str, ...],
+                  initial_data: Optional[str],
                   ) -> None:
     """Run training."""
     with main_configure(config, extra_options, verbosity, debug, data=data) as main:
-        main.train()
+        main.train(initial_data)
 
 
 @cli.command(name='evaluate')
