@@ -82,6 +82,7 @@ def train_command(config: str,
 @click.option('-m', '--model',
               help='Model checkpoint to load. Can be a dir or a specific file, absolute or relative to the logdir')
 @click.option('-n', '--num-episodes', type=int, default=10, help='Number of episodes to evaluate on')
+@click.option('--no-video', is_flag=True, help='Disable video generation for faster evaluation')
 def evaluate_command(config: str,
                      data: Optional[str],
                      verbosity: str,
@@ -89,7 +90,8 @@ def evaluate_command(config: str,
                      extra_options: Tuple[str, ...],
                      model: Optional[str],
                      num_episodes: int,
+                     no_video: bool,
                      ) -> None:
     """Evaluate checkpoint."""
     with main_configure(config, extra_options, verbosity, debug, data=data) as main:
-        main.evaluate(model, num_episodes)
+        main.evaluate(model, num_episodes, not no_video)

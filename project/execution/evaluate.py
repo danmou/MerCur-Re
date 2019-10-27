@@ -18,7 +18,7 @@ from project.models.planet import AttrDict, PlanetParams, create_tf_session
 from project.util import PrettyPrinter, Statistics, Timer, measure_time
 
 
-def evaluate(logdir: str, checkpoint: Optional[str], num_episodes: int) -> None:
+def evaluate(logdir: str, checkpoint: Optional[str], num_episodes: int, video: bool) -> None:
     params = PlanetParams()
     with params.unlocked:
         params.logdir = logdir
@@ -30,7 +30,7 @@ def evaluate(logdir: str, checkpoint: Optional[str], num_episodes: int) -> None:
     if not checkpoint:
         raise ValueError('No checkpoint specified!')
     collect_params = next(iter(config.collects.values()))  # We assume all collects have same task and planner
-    env = create_env(collect_params.task)
+    env = create_env(collect_params.task, video)
     data = create_dummy_data(env, config.preprocess_fn)
     graph = create_graph(data, config)
     agent = create_agent(graph, env, collect_params, config)
@@ -55,7 +55,8 @@ def evaluate(logdir: str, checkpoint: Optional[str], num_episodes: int) -> None:
                     num_steps, score, metrics = sess.run([steps_op, score_op, metrics_op])
             statistics.update(dict(steps=num_steps, score=score, step_time=t.interval/num_steps, **metrics))
             pp.print_row(dict(episode=episode, steps=num_steps, score=score, step_time=t.interval/num_steps, **metrics))
-            env.save_video(f'{logdir}/episode_{episode}_spl_{metrics["spl"]}')
+            if video:
+                env.save_video(f'{logdir}/episode_{episode}_spl_{metrics["spl"]}')
         logger.info('')
         logger.info('Finished evaluation.')
         logger.info('Results:')
@@ -63,16 +64,16 @@ def evaluate(logdir: str, checkpoint: Optional[str], num_episodes: int) -> None:
 
 
 @measure_time()
-def create_env(task: AttrDict):
+def create_env(task: AttrDict, capture_video: bool):
     params = task.env_ctor._args[1]  # TODO: do this in a less hacky way
-    params['capture_video'] = True
+    params['capture_video'] = capture_video
     config = params['config']
     config.defrost()
-    if 'TOP_DOWN_MAP' not in config.TASK.MEASUREMENTS:
+    if capture_video and 'TOP_DOWN_MAP' not in config.TASK.MEASUREMENTS:
         # Top-down map is expensive to compute, so we only enable it for evaluation.
         config.TASK.MEASUREMENTS.append('TOP_DOWN_MAP')
     config.freeze()
-    env = task.env_ctor()
+    env = measure_time(name='env_ctor')(task.env_ctor)()
     env = planet.control.wrappers.SelectObservations(env, task.observation_components)
     env = planet.control.wrappers.SelectMetrics(env, task.metrics)
     env = planet.control.InGraphBatchEnv(planet.control.BatchEnv([env], blocking=True))
