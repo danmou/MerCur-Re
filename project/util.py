@@ -64,12 +64,13 @@ class Timer:
 T = TypeVar('T')
 
 
-def measure_time(log_fn: Callable[[str], None] = logger.debug) -> Callable[[T], T]:
+def measure_time(log_fn: Callable[[str], None] = logger.debug, name: Optional[str] = None) -> Callable[[T], T]:
     def wrapper(fn: T) -> T:
         def timed(*args: Any, **kwargs: Any) -> Any:
             with Timer() as t:
                 result = fn(*args, **kwargs)
-            log_fn(f'Call to {fn.__name__} finished in {t.interval:.3g}s')
+            fn_name = name or fn.__name__
+            log_fn(f'Call to {fn_name} finished in {t.interval:.3g}s')
             return result
         return cast(T, timed)
     return wrapper

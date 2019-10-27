@@ -32,15 +32,25 @@ class InterceptHandler(logging.Handler):
             logging.getLogger(mod).setLevel(logging.WARNING)
 
     def emit(self, record: logging.LogRecord) -> None:
-        # Retrieve context where the logging call occurred
-        depth = next(i for i, f in enumerate(inspect.stack()[1:])
-                     if f.filename not in [logging.__file__, tf_logging.__file__]
-                     ) + 1
+        depth = self._get_depth()
         logger_opt = logger.opt(depth=depth, exception=record.exc_info)
         for line in record.getMessage().split('\n'):
             level = record.levelname
             level_: Union[str, int] = int(level[6:]) if level.startswith('Level ') else level
             logger_opt.log(level_, line.rstrip())
+
+    @staticmethod
+    def _get_depth():
+        """Finds out how far back to go in the stack trace to find the original source file"""
+        frame = inspect.currentframe().f_back
+        depth = 1
+        while frame and depth < 20:
+            file = inspect.getsourcefile(frame) or inspect.getfile(frame)
+            if file not in [logging.__file__, tf_logging.__file__]:
+                break
+            frame = frame.f_back
+            depth += 1
+        return depth
 
 
 def init_logging(verbosity: str, logdir: Union[str, Path]) -> None:
