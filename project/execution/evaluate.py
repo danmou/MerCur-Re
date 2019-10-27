@@ -38,8 +38,8 @@ def evaluate(logdir: str, checkpoint: Optional[str], num_episodes: int) -> None:
     logger.debug(f'Graph contains {planet.tools.count_weights()} trainable variables')
     sess = create_tf_session()
     with sess:
-        sess.run(tf.group(tf.local_variables_initializer(),
-                          tf.global_variables_initializer()))
+        sess.run(tf.group(tf.compat.v1.local_variables_initializer(),
+                          tf.compat.v1.global_variables_initializer()))
         restore_checkpoint(sess, checkpoint, logdir)
         sess.graph.finalize()
         statistics = Statistics(['steps', 'score', 'step_time'] + list(metrics_op.keys()),
@@ -86,7 +86,7 @@ def create_dummy_data(env: planet.control.InGraphBatchEnv,
     tensors = env.observ.copy()
     tensors['action'] = env.action
     tensors['reward'] = env.reward
-    data = {k: tf.placeholder(shape=v[0].shape, dtype=v[0].dtype) for k, v in tensors.items()}
+    data = {k: tf.compat.v1.placeholder(shape=v[0].shape, dtype=v[0].dtype) for k, v in tensors.items()}
     data['image'] = preprocess_fn(data['image'])
     sequence = {k: tf.expand_dims(v, 0) for k, v in data.items()}
     sequence['length'] = tf.constant(1, dtype=tf.int32)
@@ -98,7 +98,7 @@ def create_dummy_data(env: planet.control.InGraphBatchEnv,
 def create_graph(data: Dict[str, tf.Tensor],
                  config: AttrDict,
                  ) -> AttrDict:
-    with tf.variable_scope('graph', use_resource=True):
+    with tf.compat.v1.variable_scope('graph', use_resource=True):
         graph = AttrDict(_unlocked=True, step=tf.constant(0, dtype=tf.int32, name='step'))
         graph.update(build_network(data, config))
         graph.embedded = graph.encoder(data)
@@ -163,14 +163,14 @@ def define_episode(env: planet.control.InGraphBatchEnv,
     return num_steps, final_score, final_metrics
 
 
-def restore_checkpoint(sess: tf.Session, checkpoint: str, logdir: str) -> None:
+def restore_checkpoint(sess: tf.compat.v1.Session, checkpoint: str, logdir: str) -> None:
     # variables = planet.tools.filter_variables(exclude=[r'.*_temporary.*',
     #                                                    r'graph/collection.*',
     #                                                    r'graph/optimizer.*',
     #                                                    r'graph/phase_evaluate.*',
     #                                                    'global_step'])
     variables = planet.tools.filter_variables(include=[r'graph/head_.*', r'graph/encoder/.*', r'graph/rnn/.*'])
-    saver = tf.train.Saver(variables)
+    saver = tf.compat.v1.train.Saver(variables)
     original_checkpoint = checkpoint
     logdir = os.path.expanduser(logdir)
     checkpoint = os.path.expanduser(checkpoint)

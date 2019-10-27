@@ -76,7 +76,7 @@ class PlanetTFGPUOptions(AttrDict):
 
 
 @gin.configurable('planet.tf')
-def create_tf_session(debugger: bool = False) -> tf.Session:
+def create_tf_session(debugger: bool = False) -> tf.compat.v1.Session:
     with Timer() as t:
         options = PlanetTFOptions()
         gpu_options = PlanetTFGPUOptions()
@@ -96,17 +96,18 @@ def create_tf_session(debugger: bool = False) -> tf.Session:
                     with gpu_options.unlocked:
                         gpu_options.visible_device_list = ','.join([str(d) for d in devices])
             with options.unlocked:
-                options.gpu_options = tf.GPUOptions(**gpu_options)
-        config = tf.ConfigProto(**options)
+                options.gpu_options = tf.compat.v1.GPUOptions(**gpu_options)
+        config = tf.compat.v1.ConfigProto(**options)
         with capture_output('tensorflow'):
             try:
-                sess = tf.Session('local', config=config)
+                sess = tf.compat.v1.Session('local', config=config)
             except tf.errors.NotFoundError:
-                sess = tf.Session(config=config)
+                sess = tf.compat.v1.Session(config=config)
             if debugger:
-                sess = cast(tf.Session, tf_debug.TensorBoardDebugWrapperSession(sess,
-                                                                                'localhost:6064',
-                                                                                send_traceback_and_source_code=False))
+                sess = cast(tf.compat.v1.Session,
+                            tf_debug.TensorBoardDebugWrapperSession(sess,
+                                                                    'localhost:6064',
+                                                                    send_traceback_and_source_code=False))
     logger.debug(f'Initialized TF in {t.interval:.3g}s')
     logger.trace(f'Config:\n{gin.operative_config_str()}')
     return sess
