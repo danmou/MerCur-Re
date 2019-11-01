@@ -28,25 +28,42 @@ class Main:
                  extension: Optional[str] = None,
                  ) -> None:
         deprecation._PRINT_DEPRECATION_WARNINGS = False
+        self.debug = debug
+        self.catch_exceptions = catch_exceptions
+        self.base_logdir = base_logdir
+        self.logdir = self._create_logdir(extension)
+        init_logging(verbosity, self.logdir)
+        self._create_symlinks()
+        self._update_wandb()
+
+    def _create_logdir(self, extension: Optional[str]) -> str:
         logdir_name = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         if extension:
             logdir_name += f'-{extension}'
-        logdir = Path(base_logdir) / logdir_name
+        logdir = Path(self.base_logdir) / logdir_name
         logdir.mkdir(parents=True)
-        latest_symlink = Path(base_logdir) / 'latest'
+        return logdir
+
+    def _create_symlinks(self) -> None:
+        latest_symlink = Path(self.base_logdir) / 'latest'
         if latest_symlink.exists():
             latest_symlink.unlink()
-        latest_symlink.symlink_to(logdir)
-        init_logging(verbosity, logdir)
-        wandb.save(f'{logdir}/checkpoint')
-        wandb.save(f'{logdir}/*.ckpt*')
+        latest_symlink.symlink_to(self.logdir)
+        try:
+            wandb_name = wandb.Api().run(wandb.run.path).name
+        except wandb.apis.CommError:
+            wandb_name = None
+        if wandb_name:
+            (Path(self.base_logdir) / wandb_name).symlink_to(self.logdir)
+            logger.info(f'W&B run name: {wandb_name}')
+
+    def _update_wandb(self) -> None:
+        wandb.save(f'{self.logdir}/checkpoint')
+        wandb.save(f'{self.logdir}/*.ckpt*')
         wandb.config.update({name.rsplit('.', 1)[-1]: conf
                              for (_, name), conf in gin.config._CONFIG.items()
                              if name is not None})
         wandb.config.update({'cuda_gpus': os.environ.get('CUDA_VISIBLE_DEVICES')})
-        self.logdir = logdir
-        self.debug = debug
-        self.catch_exceptions = catch_exceptions
 
     def _catch(self, func: Callable[[], Any]) -> None:
         with logger.catch(BaseException, level='TRACE', reraise=not self.catch_exceptions):
