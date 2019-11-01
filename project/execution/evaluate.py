@@ -38,9 +38,7 @@ def evaluate(logdir: str, checkpoint: Optional[str], num_episodes: int, video: b
     logger.debug(f'Graph contains {planet.tools.count_weights()} trainable variables')
     sess = create_tf_session()
     with sess:
-        sess.run(tf.group(tf.compat.v1.local_variables_initializer(),
-                          tf.compat.v1.global_variables_initializer()))
-        restore_checkpoint(sess, checkpoint, logdir)
+        restore_checkpoint(sess, checkpoint, logdir, config.savers[0])
         sess.graph.finalize()
         statistics = Statistics(['steps', 'score', 'step_time'] + list(metrics_op.keys()),
                                 save_file=f'{logdir}/eval.csv')
@@ -164,14 +162,19 @@ def define_episode(env: planet.control.InGraphBatchEnv,
     return num_steps, final_score, final_metrics
 
 
-def restore_checkpoint(sess: tf.compat.v1.Session, checkpoint: str, logdir: str) -> None:
-    # variables = planet.tools.filter_variables(exclude=[r'.*_temporary.*',
-    #                                                    r'graph/collection.*',
-    #                                                    r'graph/optimizer.*',
-    #                                                    r'graph/phase_evaluate.*',
-    #                                                    'global_step'])
-    variables = planet.tools.filter_variables(include=[r'graph/head_.*', r'graph/encoder/.*', r'graph/rnn/.*'])
-    saver = tf.compat.v1.train.Saver(variables)
+def restore_checkpoint(sess: tf.compat.v1.Session, checkpoint: str, logdir: str, params: Dict[str, str]) -> None:
+    to_initialize = set(sess.graph.get_collection(tf.compat.v1.GraphKeys.LOCAL_VARIABLES) +
+                        planet.tools.filter_variables(include=params.get('exclude')))
+    to_restore = set(planet.tools.filter_variables(**params))
+    both = to_initialize.intersection(to_restore)
+    assert not both, f'These variables are being initialized and restored: {both}'
+    all_vars = set(sess.graph.get_collection(tf.compat.v1.GraphKeys.LOCAL_VARIABLES) +
+                   sess.graph.get_collection(tf.compat.v1.GraphKeys.GLOBAL_VARIABLES))
+    remainder = all_vars - to_initialize.union(to_restore)
+    assert not remainder, f"These variables aren't being initialized: {remainder}"
+    sess.run([tf.compat.v1.variables_initializer(list(to_initialize))])
+
+    saver = tf.compat.v1.train.Saver(to_restore)
     original_checkpoint = checkpoint
     logdir = os.path.expanduser(logdir)
     checkpoint = os.path.expanduser(checkpoint)
@@ -180,7 +183,20 @@ def restore_checkpoint(sess: tf.compat.v1.Session, checkpoint: str, logdir: str)
     checkpoint = os.path.abspath(checkpoint)
     if os.path.isdir(checkpoint):
         checkpoint = tf.train.latest_checkpoint(checkpoint)
-    if checkpoint:
-        saver.restore(sess, checkpoint)
-    else:
+    if not checkpoint:
         raise ValueError(f'Could not find checkpoint in {original_checkpoint}.')
+
+    restore_shapes = {var.name.rsplit(':')[0]: var.shape.as_list() for var in to_restore}
+    checkpoint_shapes = dict(tf.train.list_variables(checkpoint))
+    num_vars = int(sum(np.prod(shape) for shape in checkpoint_shapes.values()))
+    logger.debug(f'Checkpoint contains {num_vars} variables')
+    for name, shape in restore_shapes.items():
+        if name not in checkpoint_shapes.keys():
+            logger.warning(f'Variable {name} with shape {shape} not found in checkpoint')
+        elif checkpoint_shapes[name] != shape:
+            logger.warning(f'Variable {name} has different shape in checkpoint: {checkpoint_shapes[name]}!={shape}')
+    for name, shape in checkpoint_shapes.items():
+        if name not in restore_shapes.keys():
+            logger.debug(f'Checkpoint variable {name} with shape {shape} not being restored')
+
+    saver.restore(sess, checkpoint)
