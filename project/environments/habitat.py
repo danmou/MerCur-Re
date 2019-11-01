@@ -152,7 +152,8 @@ class Habitat(habitat.RLEnv):
         if len(self._rgb_frames) == 0:
             return
         file = Path(file)
-        images_to_video(self._rgb_frames, str(file.parent), file.name, fps=fps, quality=5)
+        with capture_output('save_video'):
+            images_to_video(self._rgb_frames, str(file.parent), file.name, fps=fps, quality=5)
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._env, name)

@@ -4,6 +4,7 @@
 
 import inspect
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
@@ -59,6 +60,9 @@ def init_logging(verbosity: str, logdir: Union[str, Path]) -> None:
 
     # Disable TF's default logging handler
     logging.getLogger('tensorflow').handlers = []
+    if logger.level(verbosity).no >= logger.level('INFO').no:
+        # Stop TF's C++ modules from printing info-level messages
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
     # Intercept all third-party logging
     logging.basicConfig(handlers=[InterceptHandler()], level=0)
