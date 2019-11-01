@@ -60,6 +60,7 @@ class Habitat(habitat.RLEnv):
                  goal_key: str,
                  reward_function: RewardFunction,
                  capture_video: bool = False,
+                 seed: Optional[int] = None,
                  **_: Any) -> None:
         self._image_key = image_key
         self._goal_key = goal_key
@@ -70,9 +71,14 @@ class Habitat(habitat.RLEnv):
         self.stop_action: int = HabitatSimActions.STOP
         self._capture_video = capture_video
         self._rgb_frames: List[np.ndarray] = []
-
+        if seed is not None:
+            # This is needed for reproducible episode shuffling
+            random.seed(seed)
+            np.random.seed(seed)
         with capture_output('habitat_sim'):
             super().__init__(config)
+        if seed is not None:
+            self.seed(seed)
         self.observation_space: gym.spaces.Dict = gym.spaces.Dict(self._update_keys(self._env.observation_space.spaces))
         self.action_space = self._env.action_space
 
@@ -220,6 +226,9 @@ class VectorHabitat(VectorEnv):
     def save_video(self, file: Union[str, Path], **kwargs) -> None:
         kwargs['file'] = file
         self.call_at(0, 'save_video', kwargs)
+
+    def seed(self, seed: int) -> None:
+        self.call_at(0, 'seed', {'seed': seed})
 
     def step(self, action: Any) -> ObsTuple:  # type: ignore
         obs, reward, done, info = super().step(data=[{'action': action}])[0]

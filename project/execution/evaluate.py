@@ -4,9 +4,11 @@
 
 import functools
 import os.path
+import random
 from collections import namedtuple
 from typing import Callable, Dict, Optional, Tuple
 
+import numpy as np
 import planet
 import planet.control.wrappers
 import tensorflow as tf
@@ -18,7 +20,12 @@ from project.models.planet import AttrDict, PlanetParams, create_tf_session
 from project.util import PrettyPrinter, Statistics, Timer, measure_time
 
 
-def evaluate(logdir: str, checkpoint: Optional[str], num_episodes: int, video: bool) -> None:
+def evaluate(logdir: str, checkpoint: Optional[str], num_episodes: int, video: bool, seed: Optional[int]) -> None:
+    if seed is not None:
+        logger.info('Running evaluation without parallel loops (this is deterministic but ~50% slower).')
+        random.seed(seed)
+        np.random.seed(seed)
+        tf.compat.v1.set_random_seed(seed)
     params = PlanetParams()
     with params.unlocked:
         params.logdir = logdir
@@ -30,10 +37,10 @@ def evaluate(logdir: str, checkpoint: Optional[str], num_episodes: int, video: b
     if not checkpoint:
         raise ValueError('No checkpoint specified!')
     collect_params = next(iter(config.collects.values()))  # We assume all collects have same task and planner
-    env = create_env(collect_params.task, video)
+    env = create_env(collect_params.task, video, seed)
     data = create_dummy_data(env, config.preprocess_fn)
     graph = create_graph(data, config)
-    agent = create_agent(graph, env, collect_params, config)
+    agent = create_agent(graph, env, collect_params, config, deterministic=seed is not None)
     steps_op, score_op, metrics_op = define_episode(env, agent)
     logger.debug(f'Graph contains {planet.tools.count_weights()} trainable variables')
     sess = create_tf_session()
@@ -62,16 +69,17 @@ def evaluate(logdir: str, checkpoint: Optional[str], num_episodes: int, video: b
 
 
 @measure_time()
-def create_env(task: AttrDict, capture_video: bool):
+def create_env(task: AttrDict, capture_video: bool, seed: Optional[int]) -> planet.control.InGraphBatchEnv:
     params = task.env_ctor._args[1]  # TODO: do this in a less hacky way
     params['capture_video'] = capture_video
+    params['seed'] = seed
     config = params['config']
     config.defrost()
     if capture_video and 'TOP_DOWN_MAP' not in config.TASK.MEASUREMENTS:
         # Top-down map is expensive to compute, so we only enable it for evaluation.
         config.TASK.MEASUREMENTS.append('TOP_DOWN_MAP')
     config.freeze()
-    env = measure_time(name='env_ctor')(task.env_ctor)()
+    env = task.env_ctor()
     env = planet.control.wrappers.SelectObservations(env, task.observation_components)
     env = planet.control.wrappers.SelectMetrics(env, task.metrics)
     with tf.compat.v1.variable_scope('environment', use_resource=True):
@@ -112,6 +120,7 @@ def create_agent(graph: AttrDict,
                  env: planet.control.InGraphBatchEnv,
                  params: AttrDict,
                  config: AttrDict,
+                 deterministic: bool,
                  ) -> planet.control.MPCAgent:
     agent_config = AttrDict(
         cell=graph.cell,
@@ -121,7 +130,7 @@ def create_agent(graph: AttrDict,
         exploration=params.exploration,
         preprocess_fn=config.preprocess_fn,
         postprocess_fn=config.postprocess_fn)
-    return planet.control.MPCAgent(env, graph.step, False, False, agent_config)
+    return planet.control.MPCAgent(env, graph.step, False, False, agent_config, deterministic)
 
 
 @measure_time()

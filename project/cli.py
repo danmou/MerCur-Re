@@ -85,6 +85,7 @@ def train_command(config: str,
               help='Model checkpoint to load. Can be a dir or a specific file, absolute or relative to the logdir')
 @click.option('-n', '--num-episodes', type=int, default=10, help='Number of episodes to evaluate on')
 @click.option('--no-video', is_flag=True, help='Disable video generation for faster evaluation')
+@click.option('--seed', type=int, help='Set seed for random values (this will also disable parallelization of loops)')
 def evaluate_command(config: str,
                      data: Optional[str],
                      verbosity: str,
@@ -93,7 +94,8 @@ def evaluate_command(config: str,
                      model: Optional[str],
                      num_episodes: int,
                      no_video: bool,
+                     seed: Optional[int],
                      ) -> None:
     """Evaluate checkpoint."""
     with main_configure(config, extra_options, verbosity, debug, data=data) as main:
-        main.evaluate(model, num_episodes, not no_video)
+        main.evaluate(model, num_episodes, not no_video, seed)

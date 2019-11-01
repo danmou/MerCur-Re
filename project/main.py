@@ -64,8 +64,8 @@ class Main:
             wandb.save(f'{self.logdir}/checkpoint', policy='end')
             wandb.save(f'{self.logdir}/*.ckpt*', policy='end')
 
-    def evaluate(self, checkpoint: Optional[str], num_episodes: int, video: bool) -> None:
-        self._catch(lambda: evaluate(str(self.logdir), checkpoint, num_episodes, video))
+    def evaluate(self, checkpoint: Optional[str], num_episodes: int, video: bool, seed: Optional[int]) -> None:
+        self._catch(lambda: evaluate(str(self.logdir), checkpoint, num_episodes, video, seed))
 
 
 @contextlib.contextmanager
