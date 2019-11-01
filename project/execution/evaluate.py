@@ -74,7 +74,8 @@ def create_env(task: AttrDict, capture_video: bool):
     env = measure_time(name='env_ctor')(task.env_ctor)()
     env = planet.control.wrappers.SelectObservations(env, task.observation_components)
     env = planet.control.wrappers.SelectMetrics(env, task.metrics)
-    env = planet.control.InGraphBatchEnv(planet.control.BatchEnv([env], blocking=True))
+    with tf.compat.v1.variable_scope('environment', use_resource=True):
+        env = planet.control.InGraphBatchEnv(planet.control.BatchEnv([env], blocking=True))
     return env
 
 
