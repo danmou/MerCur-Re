@@ -25,7 +25,7 @@ def run_agent(sweep_id: str, gpu: str, config: str, verbosity: str = 'INFO') -> 
     def train() -> None:
         try:
             os.environ['CUDA_VISIBLE_DEVICES'] = gpu
-            os.environ['WANDB_SILENT'] = 'true'
+            os.environ[wandb.env.SILENT] = 'true'
             wandb.init()
             extra_options = tuple(f'{name}={val}' for name, val in wandb.config.user_items())
             print(f'Job on GPU {gpu} starting with options:\n' + '\n'.join(extra_options))

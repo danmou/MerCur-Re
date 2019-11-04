@@ -3,15 +3,16 @@
 # (C) 2019, Daniel Mouritzen
 
 import functools
-import os.path
 import random
 from collections import namedtuple
+from pathlib import Path
 from typing import Callable, Dict, Optional, Tuple
 
 import numpy as np
 import planet
 import planet.control.wrappers
 import tensorflow as tf
+import wandb
 from loguru import logger
 from planet.scripts.configs import default as planet_config
 from planet.training.define_model import build_network
@@ -20,7 +21,12 @@ from project.models.planet import AttrDict, PlanetParams, create_tf_session
 from project.util import PrettyPrinter, Statistics, Timer, measure_time
 
 
-def evaluate(logdir: str, checkpoint: Optional[str], num_episodes: int, video: bool, seed: Optional[int]) -> None:
+def evaluate(logdir: Path,
+             checkpoint: Optional[Path],
+             num_episodes: int,
+             video: bool,
+             seed: Optional[int],
+             sync_wandb: bool = True) -> None:
     if seed is not None:
         logger.info('Running evaluation without parallel loops (this is deterministic but ~50% slower).')
         random.seed(seed)
@@ -28,13 +34,12 @@ def evaluate(logdir: str, checkpoint: Optional[str], num_episodes: int, video: b
         tf.compat.v1.set_random_seed(seed)
     params = PlanetParams()
     with params.unlocked:
-        params.logdir = logdir
+        params.logdir = str(logdir)
         params.batch_shape = [1, 1]
     config = AttrDict()
     with config.unlocked:
         config = planet_config(config, params)
-    checkpoint = checkpoint or config.checkpoint_to_load
-    if not checkpoint:
+    if checkpoint is None:
         raise ValueError('No checkpoint specified!')
     collect_params = next(iter(config.collects.values()))  # We assume all collects have same task and planner
     env = create_env(collect_params.task, video, seed)
@@ -48,7 +53,7 @@ def evaluate(logdir: str, checkpoint: Optional[str], num_episodes: int, video: b
         restore_checkpoint(sess, checkpoint, logdir, config.savers[0])
         sess.graph.finalize()
         statistics = Statistics(['steps', 'score', 'step_time'] + list(metrics_op.keys()),
-                                save_file=f'{logdir}/eval.csv')
+                                save_file=logdir / 'eval.csv')
         pp = PrettyPrinter(['episode', 'steps', 'score', 'step_time'] + list(metrics_op.keys()))
         pp.print_header()
         for episode in range(num_episodes):
@@ -61,11 +66,21 @@ def evaluate(logdir: str, checkpoint: Optional[str], num_episodes: int, video: b
             statistics.update(dict(steps=num_steps, score=score, step_time=t.interval/num_steps, **metrics))
             pp.print_row(dict(episode=episode, steps=num_steps, score=score, step_time=t.interval/num_steps, **metrics))
             if video:
-                env.save_video(f'{logdir}/episode_{episode}_spl_{metrics["spl"]}')
+                env.save_video(logdir / f'episode_{episode}_spl_{metrics["spl"]:.2f}')
         logger.info('')
         logger.info('Finished evaluation.')
         logger.info('Results:')
         statistics.print()
+        if sync_wandb:
+            # First delete existing summary items
+            for k in list(wandb.run.summary._json_dict.keys()):
+                wandb.run.summary._root_del((k,))
+
+            wandb.run.summary.update(statistics.mean)
+            wandb.run.summary['seed'] = seed
+            if video:
+                for vid in logdir.glob('episode*.mp4'):
+                    wandb.run.summary[vid.stem] = wandb.Video(str(vid), fps=20, format="mp4")
 
 
 @measure_time()
@@ -172,7 +187,7 @@ def define_episode(env: planet.control.InGraphBatchEnv,
     return num_steps, final_score, final_metrics
 
 
-def restore_checkpoint(sess: tf.compat.v1.Session, checkpoint: str, logdir: str, params: Dict[str, str]) -> None:
+def restore_checkpoint(sess: tf.compat.v1.Session, checkpoint: Path, logdir: Path, params: Dict[str, str]) -> None:
     to_initialize = set(sess.graph.get_collection(tf.compat.v1.GraphKeys.LOCAL_VARIABLES) +
                         planet.tools.filter_variables(include=params.get('exclude')))
     to_restore = set(planet.tools.filter_variables(**params))
@@ -186,18 +201,18 @@ def restore_checkpoint(sess: tf.compat.v1.Session, checkpoint: str, logdir: str,
 
     saver = tf.compat.v1.train.Saver(to_restore)
     original_checkpoint = checkpoint
-    logdir = os.path.expanduser(logdir)
-    checkpoint = os.path.expanduser(checkpoint)
-    if not os.path.isabs(checkpoint):
-        checkpoint = os.path.join(logdir, checkpoint)
-    checkpoint = os.path.abspath(checkpoint)
-    if os.path.isdir(checkpoint):
-        checkpoint = tf.train.latest_checkpoint(checkpoint)
+    logdir = logdir.expanduser()
+    checkpoint = checkpoint.expanduser()
+    if not checkpoint.is_absolute():
+        checkpoint = logdir / checkpoint
+    checkpoint = checkpoint.resolve()
+    if checkpoint.is_dir():
+        checkpoint = tf.train.latest_checkpoint(str(checkpoint))
     if not checkpoint:
         raise ValueError(f'Could not find checkpoint in {original_checkpoint}.')
 
     restore_shapes = {var.name.rsplit(':')[0]: var.shape.as_list() for var in to_restore}
-    checkpoint_shapes = dict(tf.train.list_variables(checkpoint))
+    checkpoint_shapes = dict(tf.train.list_variables(str(checkpoint)))
     num_vars = int(sum(np.prod(shape) for shape in checkpoint_shapes.values()))
     logger.debug(f'Checkpoint contains {num_vars} variables')
     for name, shape in restore_shapes.items():
@@ -209,4 +224,4 @@ def restore_checkpoint(sess: tf.compat.v1.Session, checkpoint: str, logdir: str,
         if name not in restore_shapes.keys():
             logger.debug(f'Checkpoint variable {name} with shape {shape} not being restored')
 
-    saver.restore(sess, checkpoint)
+    saver.restore(sess, str(checkpoint))

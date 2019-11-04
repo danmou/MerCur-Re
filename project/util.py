@@ -108,7 +108,7 @@ class PrettyPrinter:
 
 class Statistics:
     """Calculate mean, variance and standard deviation from streaming data represented as dicts"""
-    def __init__(self, keys: Sequence[str], save_file: Optional[str] = None) -> None:
+    def __init__(self, keys: Sequence[str], save_file: Union[str, Path, None] = None) -> None:
         self._keys = keys
         self._count = 0
         self._means = np.zeros([len(keys)])

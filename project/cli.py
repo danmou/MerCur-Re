@@ -4,9 +4,11 @@
 
 import os
 import textwrap
+from pathlib import Path
 from typing import Any, Callable, Optional, Tuple
 
 import click
+import wandb
 
 from project.main import main_configure
 from project.util import get_config_dir
@@ -40,7 +42,7 @@ def with_global_options(func: Callable[..., None]) -> Callable[..., None]:
         if logdir:
             extra_options += (f'main.base_logdir="{logdir}"',)
         if debug:
-            os.environ['WANDB_MODE'] = 'dryrun'
+            os.environ[wandb.env.MODE] = 'dryrun'
         if config is None:
             config = f'{get_config_dir()}/{"debug" if debug else "default"}.gin'
             if verbose:
@@ -81,21 +83,35 @@ def train_command(config: str,
 
 @cli.command(name='evaluate')
 @with_global_options
-@click.option('-m', '--model',
-              help='Model checkpoint to load. Can be a dir or a specific file, absolute or relative to the logdir')
+@click.option('-m', '--model', help='Model checkpoint to load. Can be a dir or a specific file')
+@click.option('--wandb-run', help='W&B run to evaluate. Can be full id or part of name '
+                                  '(the latest matching run will be used)')
 @click.option('-n', '--num-episodes', type=int, default=10, help='Number of episodes to evaluate on')
 @click.option('--no-video', is_flag=True, help='Disable video generation for faster evaluation')
 @click.option('--seed', type=int, help='Set seed for random values (this will also disable parallelization of loops)')
+@click.option('--no-sync', is_flag=True, help="Don't upload results to W&B")
 def evaluate_command(config: str,
                      data: Optional[str],
                      verbosity: str,
                      debug: bool,
                      extra_options: Tuple[str, ...],
                      model: Optional[str],
+                     wandb_run: Optional[str],
                      num_episodes: int,
                      no_video: bool,
                      seed: Optional[int],
+                     no_sync: bool,
                      ) -> None:
     """Evaluate checkpoint."""
-    with main_configure(config, extra_options, verbosity, debug, data=data) as main:
-        main.evaluate(model, num_episodes, not no_video, seed)
+    # assert model or wandb_run, 'Either --model or --wandb-run must be specified!'
+    if not wandb_run:
+        os.environ[wandb.env.MODE] = 'dryrun'
+    model = model and Path(model)
+    with main_configure(config,
+                        extra_options,
+                        verbosity,
+                        debug,
+                        data=data,
+                        job_type='eval',
+                        wandb_continue=wandb_run) as main:
+        main.evaluate(model, num_episodes, not no_video, seed, no_sync)

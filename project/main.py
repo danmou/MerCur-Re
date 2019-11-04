@@ -11,6 +11,8 @@ from typing import Any, Callable, Generator, Optional, Tuple, Union
 
 import gin
 import wandb
+import wandb.settings
+import yaml
 from loguru import logger
 from tensorflow.python.util import deprecation
 
@@ -30,17 +32,20 @@ class Main:
         deprecation._PRINT_DEPRECATION_WARNINGS = False
         self.debug = debug
         self.catch_exceptions = catch_exceptions
-        self.base_logdir = base_logdir
+        self.base_logdir = Path(base_logdir)
         self.logdir = self._create_logdir(extension)
         init_logging(verbosity, self.logdir)
-        self._create_symlinks()
-        self._update_wandb()
+        if wandb.run.resumed:
+            self._restore_wandb_checkpoint()
+        else:
+            self._create_symlinks()
+            self._update_wandb()
 
-    def _create_logdir(self, extension: Optional[str]) -> str:
+    def _create_logdir(self, extension: Optional[str]) -> Path:
         logdir_name = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         if extension:
             logdir_name += f'-{extension}'
-        logdir = Path(self.base_logdir) / logdir_name
+        logdir = self.base_logdir / logdir_name
         logdir.mkdir(parents=True)
         return logdir
 
@@ -65,6 +70,22 @@ class Main:
                              if name is not None})
         wandb.config.update({'cuda_gpus': os.environ.get('CUDA_VISIBLE_DEVICES')})
 
+    def _restore_wandb_checkpoint(self) -> None:
+        restored_files = []
+        try:
+            ckpt_file = yaml.safe_load(wandb.restore('checkpoint')).get('model_checkpoint_path')
+            restored_files.append('checkpoint')
+            assert ckpt_file, "Can't resume wandb run: no checkpoint found!"
+            ckpt_name = Path(ckpt_file).name
+            for ext in ['index', 'meta', 'data-00000-of-00001']:
+                name = f'{ckpt_name}.{ext}'
+                restored_files.append(name)
+                wandb.restore(name)
+        finally:
+            # Even if an error occurred, we don't want wandb to re-upload the downloaded files
+            for file in restored_files:
+                (Path(wandb.run.dir) / file).rename(self.logdir / file)
+
     def _catch(self, func: Callable[[], Any]) -> None:
         with logger.catch(BaseException, level='TRACE', reraise=not self.catch_exceptions):
             if self.catch_exceptions:
@@ -81,8 +102,23 @@ class Main:
             wandb.save(f'{self.logdir}/checkpoint', policy='end')
             wandb.save(f'{self.logdir}/*.ckpt*', policy='end')
 
-    def evaluate(self, checkpoint: Optional[str], num_episodes: int, video: bool, seed: Optional[int]) -> None:
-        self._catch(lambda: evaluate(str(self.logdir), checkpoint, num_episodes, video, seed))
+    def evaluate(self,
+                 checkpoint: Optional[Path] = None,
+                 num_episodes: int = 10,
+                 video: bool = True,
+                 seed: Optional[int] = None,
+                 no_sync: bool = False,
+                 ) -> None:
+        if not checkpoint and wandb.run.resumed:
+            checkpoint = self.logdir
+        if checkpoint is None:
+            raise ValueError('No checkpoint specified!')
+        self._catch(lambda: evaluate(self.logdir,
+                                     checkpoint,
+                                     num_episodes,
+                                     video,
+                                     seed,
+                                     sync_wandb=wandb.run.resumed and not no_sync))
 
 
 @contextlib.contextmanager
@@ -91,14 +127,21 @@ def main_configure(config: str,
                    verbosity: str,
                    debug: bool = False,
                    catch_exceptions: bool = True,
+                   job_type: str = 'training',
                    data: Optional[str] = None,
                    extension: Optional[str] = None,
+                   wandb_continue: Optional[str] = None,
                    ) -> Generator[Main, None, None]:
-    wandb.init(project="thesis", sync_tensorboard=True)
+    if wandb_continue is not None:
+        run = _get_wandb_run(wandb_continue)
+        resume_args = dict(resume=True, id=run.id, name=run.name, config=run.config, notes=run.notes, tags=run.tags)
+    else:
+        resume_args = {}
+    wandb.init(sync_tensorboard=True, job_type=job_type, **resume_args)
     gin.parse_config_files_and_bindings([config], extra_options)
     with gin.unlock_config():
         gin.bind_parameter('main.base_logdir', str(Path(gin.query_parameter('main.base_logdir')).absolute()))
-    with open(Path(wandb.run.dir) / 'config.gin', 'w') as f:
+    with open(Path(wandb.run.dir) / f'config_{job_type}.gin', 'w') as f:
         f.write(open(config).read())
         f.write('\n# Extra options\n')
         f.write('\n'.join(extra_options))
@@ -113,3 +156,19 @@ def main_configure(config: str,
     finally:
         if tempdir:
             tempdir.cleanup()
+
+
+def _get_wandb_run(name: str) -> wandb.apis.public.Run:
+    api = wandb.Api()
+    entity, project = (wandb.settings.Settings().get('default', setting) for setting in ['entity', 'project'])
+    try:
+        run = api.run(f'{entity}/{project}/{name}')
+    except wandb.apis.CommError:
+        # name is not a valid run id so we assume it's the name of a run
+        runs = api.runs(f'{entity}/{project}', order="-created_at")
+        for run in runs:
+            if name in run.name:
+                break
+        else:
+            raise ValueError(f'No run found with id or name {name}.')
+    return run
