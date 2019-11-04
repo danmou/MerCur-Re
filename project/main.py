@@ -14,7 +14,7 @@ import wandb
 from loguru import logger
 from tensorflow.python.util import deprecation
 
-from project.logging import init_logging
+from project.logging_utils import init_logging
 from project.execution import evaluate, train
 
 
