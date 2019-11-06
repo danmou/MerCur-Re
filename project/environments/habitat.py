@@ -6,20 +6,21 @@ import random
 from mock import MagicMock
 from pathlib import Path
 from shutil import copyfile
-from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 import gin
 import gym.spaces
 import habitat
+import habitat_sim
 import numpy as np
-import skimage.transform
 import wandb
 from habitat.core.simulator import Observations
 from habitat.core.vector_env import VectorEnv
-from habitat.sims.habitat_simulator.actions import HabitatSimActions
-from habitat.tasks.nav.nav import NavigationEpisode
+from habitat.sims.habitat_simulator.actions import HabitatSimActions, HabitatSimV1ActionSpaceConfiguration
+from habitat.tasks.nav.nav import NavigationEpisode, SimulatorTaskAction
 from habitat.utils.visualizations.utils import images_to_video, observations_to_image
-from loguru import logger
+from habitat_sim.agent.controls.controls import ActuationSpec
+from habitat_sim.agent.controls.default_controls import LookLeft
 
 from project.util import capture_output, get_config_dir, measure_time
 
@@ -36,7 +37,7 @@ class Success(habitat.Measure):
         super().__init__(*args, **kwargs)
 
     def _get_uuid(self, *args: Any, **kwargs: Any) -> str:
-        return "success"
+        return 'success'
 
     def reset_metric(self, *args: Any, **kwargs: Any) -> None:
         self._metric = None
@@ -49,8 +50,39 @@ class Success(habitat.Measure):
         current_position = self._sim.get_agent_state().position.tolist()
         distance_to_target = self._sim.geodesic_distance(current_position, episode.goals[0].position)
 
-        self._metric = int(getattr(task, "is_stop_called", False) and
+        self._metric = int(getattr(task, 'is_stop_called', False) and
                            distance_to_target < self._config.SUCCESS_DISTANCE)
+
+
+@habitat_sim.registry.register_move_fn(body_action=True)
+class TurnAngle(LookLeft):
+    """
+    This class defines a simulator action that turns counter-clockwise some number of degrees specified by
+    the class variable `angle`
+    """
+
+    angle = 0.0
+
+    def __call__(self, scene_node: habitat_sim.SceneNode, actuation_spec: ActuationSpec):
+        actuation_spec.amount = TurnAngle.angle
+        super().__call__(scene_node, actuation_spec)
+
+
+@habitat.registry.register_task_action
+class TurnAngleAction(SimulatorTaskAction):
+    def _get_uuid(self, *args: Any, **kwargs: Any) -> str:
+        return 'turn_angle'
+
+    def step(self, *args: Any, **kwargs: Any) -> ObsTuple:
+        return self._sim.step(HabitatSimActions.TURN_ANGLE)
+
+
+@habitat.registry.register_action_space_configuration
+class TurnAngleActionSpace(HabitatSimV1ActionSpaceConfiguration):
+    def get(self):
+        config = super().get()
+        config[HabitatSimActions.TURN_ANGLE] = habitat_sim.ActionSpec('turn_angle', ActuationSpec(0.0))
+        return config
 
 
 class Habitat(habitat.RLEnv):
@@ -61,12 +93,14 @@ class Habitat(habitat.RLEnv):
                  reward_function: RewardFunction,
                  capture_video: bool = False,
                  seed: Optional[int] = None,
+                 min_duration: int = 0,
+                 max_duration: int = 500,
                  **_: Any) -> None:
         self._image_key = image_key
         self._goal_key = goal_key
         self._reward_function = reward_function
         self._reward_function.set_env(self)
-        self._previous_action: Optional[int] = None
+        self._called_stop: bool = False
         self.success_distance = config.TASK.SUCCESS_DISTANCE
         self.stop_action: int = HabitatSimActions.STOP
         self._capture_video = capture_video
@@ -81,6 +115,25 @@ class Habitat(habitat.RLEnv):
             self.seed(seed)
         self.observation_space: gym.spaces.Dict = gym.spaces.Dict(self._update_keys(self._env.observation_space.spaces))
         self.action_space = self._env.action_space
+        self.action_space = gym.spaces.Box(low=-1, high=1, shape=(1,), dtype=np.float32)
+        self._min_duration = min_duration
+        self._max_duration = max_duration
+        self._step_count = 0
+
+    def reconfigure(self, config: habitat.Config, capture_video: Optional[bool] = None, seed: Optional[int] = None):
+        if capture_video is not None:
+            self._capture_video = capture_video
+        if seed is not None:
+            random.seed(seed)
+            np.random.seed(seed)
+        if seed is not None:
+            # This is needed for reproducible episode shuffling
+            random.seed(seed)
+            np.random.seed(seed)
+        with capture_output('habitat_sim'):
+            self.habitat_env.reconfigure(config)
+        if seed is not None:
+            self.seed(seed)
 
     def get_reward_range(self) -> Tuple[float, float]:
         return self._reward_function.get_reward_range()
@@ -92,7 +145,7 @@ class Habitat(habitat.RLEnv):
         return self._env.episode_over or self.episode_success()
 
     def episode_success(self) -> bool:
-        return self._previous_action == self.stop_action and self.distance_to_target() < self.success_distance
+        return self._called_stop and self.distance_to_target() < self.success_distance
 
     def distance_to_target(self) -> float:
         current_position = self._env.sim.get_agent_state().position.tolist()
@@ -113,19 +166,47 @@ class Habitat(habitat.RLEnv):
             metrics['collisions'] = metrics['collisions']['count']
         return metrics
 
-    def step(self, action: int) -> ObsTuple:  # type: ignore
-        self._previous_action = action
-        obs, reward, done, info = super().step(action)
+    def step(self, action: Union[np.ndarray, float]) -> ObsTuple:  # type: ignore
+        self._called_stop = False
+        action = float(action)
+        self._step_count += 1
+        if self._step_count >= self._max_duration or \
+                self._step_count >= self._min_duration and self.distance_to_target() < self.success_distance:
+            obs, reward, done, info = super().step('STOP')
+            self._called_stop = True
+            info['taken_action'] = 0.0
+        else:
+            TurnAngle.angle = action * 90.0 / 2
+            sum_reward = 0.0
+            for sub_action in ['TURN_ANGLE',
+                               'MOVE_FORWARD',
+                               'TURN_ANGLE']:
+                obs, reward, done, info = super().step(sub_action)
+                sum_reward += reward
+                if done:
+                    break
+            info['taken_action'] = action
+            reward = sum_reward
         obs = self._update_keys(obs)
         if self._capture_video:
             # upscale image to make the resulting video more viewable
             new_obs = {'rgb': np.repeat(np.repeat(obs['image'], 4, axis=0), 4, axis=1)}
+            act = action * 0.9
+            if act:
+                img_size = new_obs['rgb'].shape[0]
+                start = img_size / 2
+                end = img_size * (1 - act) / 2
+                left = round(min(start, end))
+                right = round(max(start, end))
+                new_obs['rgb'][round(img_size*0.9):round(img_size*0.95),
+                               round(left):round(right)] = np.array([0, 0, 255])
+
             self._rgb_frames.append(observations_to_image(new_obs, self.habitat_env.get_metrics()))
-        info['taken_action'] = action
         return obs, reward, done, info
 
     def reset(self) -> Observations:
-        self._previous_action = None
+        self._called_stop = False
+        self._step_count = 0
         self._reward_function.reset()
         self._rgb_frames = []
         with capture_output('habitat_sim'):
@@ -147,7 +228,7 @@ class Habitat(habitat.RLEnv):
             self._env.close()
 
     @measure_time()
-    def save_video(self, file: Union[str, Path], fps: int = 20) -> None:
+    def save_video(self, file: Union[str, Path], fps: int = 10) -> None:
         assert self._capture_video, 'Not capturing video; nothing to save.'
         if len(self._rgb_frames) == 0:
             return
@@ -228,6 +309,9 @@ class VectorHabitat(VectorEnv):
         kwargs['file'] = file
         self.call_at(0, 'save_video', kwargs)
 
+    def reconfigure(self, **kwargs) -> None:
+        self.call_at(0, 'reconfigure', kwargs)
+
     def seed(self, seed: int) -> None:
         self.call_at(0, 'seed', {'seed': seed})
 
@@ -257,11 +341,16 @@ def get_config(max_steps: Optional[Union[int, float]] = None,
         dataset = f'{get_config_dir()}/habitat/datasets/{dataset}.yaml'
     copyfile(task, Path(wandb.run.dir) / 'task.yaml')
     copyfile(dataset, Path(wandb.run.dir) / 'dataset.yaml')
+    if not HabitatSimActions.has_action('TURN_ANGLE'):
+        HabitatSimActions.extend_action_space('TURN_ANGLE')
     config = habitat.get_config([task, dataset], opts)
     config.defrost()
     config.TASK.SUCCESS = habitat.Config()
-    config.TASK.SUCCESS.TYPE = "Success"
+    config.TASK.SUCCESS.TYPE = 'Success'
     config.TASK.SUCCESS.SUCCESS_DISTANCE = config.TASK.SUCCESS_DISTANCE
-    config.TASK.MEASUREMENTS.append("SUCCESS")
+    config.TASK.MEASUREMENTS.append('SUCCESS')
+    config.TASK.ACTIONS.TURN_ANGLE = habitat.Config()
+    config.TASK.ACTIONS.TURN_ANGLE.TYPE = 'TurnAngleAction'
+    config.TASK.POSSIBLE_ACTIONS = ['STOP', 'MOVE_FORWARD', 'TURN_ANGLE']
     config.freeze()
     return {'config': config, 'image_key': image_key, 'goal_key': goal_key, 'reward_function': reward_function}

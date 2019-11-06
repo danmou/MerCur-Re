@@ -60,7 +60,7 @@ def planet_habitat_task(config: AttrDict,
               'max_duration': max_length,
               'capture_video': False}
     params['wrappers'] = [(Wrapper, kwarg_fn(params)) for Wrapper, kwarg_fn in wrappers]
-    params.update(habitat.get_config(max_steps=max_length*action_repeat))
+    params.update(habitat.get_config(max_steps=max_length*action_repeat*3))  # times 3 because TURN_ANGLE is really 3 actions
     env_ctor = planet.tools.bind(habitat.VectorHabitat, habitat_env_ctor, params)
     return PlanetTask('habitat', env_ctor, max_length, state_components, observation_components, metrics)
 

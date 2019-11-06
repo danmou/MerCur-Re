@@ -1,9 +1,7 @@
 SIMULATOR:
   TYPE: 'Sim-v0'
-  ACTION_SPACE_CONFIG: 'v0'
+  ACTION_SPACE_CONFIG: 'TurnAngleActionSpace'
   FORWARD_STEP_SIZE: 0.25  # meters
-  TURN_ANGLE: 10  # degrees
-  TILT_ANGLE: 15  # degrees
   AGENT_0:
     HEIGHT: 1.5  # meters
     RADIUS: 0.1  # meters

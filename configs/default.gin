@@ -59,12 +59,7 @@ planet.tf.gpu_options.visible_device_list = '1'
 
 ### Habitat ###
 # Basic
-planet_habitat_task.wrappers = [@automatic_stop(),
-                                @action_repeat(),
-                                @discrete_wrapper(),
-                                @minimum_duration()]
-discrete_wrapper.sample = False
-automatic_stop.enable = True
+planet_habitat_task.wrappers = [@action_repeat()]
 Habitat.task = 'pointnav'
 Habitat.dataset = 'habitat_test'
 Habitat.gpu_id = 0
