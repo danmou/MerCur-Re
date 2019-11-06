@@ -5,13 +5,17 @@
 from pathlib import Path
 from typing import Optional
 
+import gin
+import tensorflow as tf
 from loguru import logger
 from planet.scripts.train import process as planet_train
 
 from project.models.planet import PlanetParams, AttrDict
+from .evaluate import evaluate
 
 
-def train(logdir: str, initial_data: Optional[str]) -> None:
+@gin.configurable(whitelist=['num_eval_episodes'])
+def train(logdir: str, initial_data: Optional[str], num_eval_episodes: int = 10) -> None:
     params = PlanetParams()
     if initial_data:
         with params.unlocked:
@@ -29,6 +33,15 @@ def train(logdir: str, initial_data: Optional[str]) -> None:
         args.config = 'default'
         args.params = params
 
-    for score in planet_train(logdir, args):
-        pass
+    def eval_(envs):
+        with tf.Graph().as_default():
+            evaluate(logdir=Path(logdir),
+                     checkpoint=Path(logdir),
+                     num_episodes=num_eval_episodes,
+                     video=True,
+                     seed=1,
+                     sync_wandb=True,
+                     existing_env=envs['habitat'])
+    for score, envs in planet_train(logdir, args):
+        eval_(envs)
     logger.info('Run completed.')

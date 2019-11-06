@@ -19,6 +19,8 @@ planet.train_steps = 100  # training batches per epoch
 planet.test_steps = 1  # test steps per epoch
 planet.max_epochs = 200  # maximum number of epochs
 planet.checkpoint_every = 5  # epochs between checkpoints
+planet.eval_every = 20  # epochs between evaluations
+train.num_eval_episodes = 10  # episodes per evaluation
 planet.checkpoint_to_load = None  # can be a dir or a specific file, absolute or relative to the logdir
 
 # Example: continue from still-gorge-205

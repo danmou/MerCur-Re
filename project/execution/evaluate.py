@@ -8,6 +8,7 @@ from collections import namedtuple
 from pathlib import Path
 from typing import Callable, Dict, Optional, Tuple
 
+import habitat
 import numpy as np
 import planet
 import planet.control.wrappers
@@ -17,16 +18,18 @@ from loguru import logger
 from planet.scripts.configs import default as planet_config
 from planet.training.define_model import build_network
 
+from project.environments.habitat import VectorHabitat
 from project.models.planet import AttrDict, PlanetParams, create_tf_session
 from project.util import PrettyPrinter, Statistics, Timer, measure_time
 
 
 def evaluate(logdir: Path,
-             checkpoint: Optional[Path],
-             num_episodes: int,
-             video: bool,
-             seed: Optional[int],
-             sync_wandb: bool = True) -> None:
+             checkpoint: Path,
+             num_episodes: int = 10,
+             video: bool = True,
+             seed: Optional[int] = None,
+             sync_wandb: bool = True,
+             existing_env: VectorHabitat = None) -> None:
     if seed is not None:
         logger.info('Running evaluation without parallel loops (this is deterministic but ~50% slower).')
         random.seed(seed)
@@ -39,10 +42,14 @@ def evaluate(logdir: Path,
     config = AttrDict()
     with config.unlocked:
         config = planet_config(config, params)
-    if checkpoint is None:
-        raise ValueError('No checkpoint specified!')
     collect_params = next(iter(config.collects.values()))  # We assume all collects have same task and planner
-    env = create_env(collect_params.task, video, seed)
+    if existing_env is None:
+        env = create_env(collect_params.task, video, seed)
+        old_config = None
+    else:
+        env = existing_env
+        old_config = reconfigure_env(env, video, seed)
+    env = wrap_env(env, collect_params.task)
     data = create_dummy_data(env, config.preprocess_fn)
     graph = create_graph(data, config)
     agent = create_agent(graph, env, collect_params, config, deterministic=seed is not None)
@@ -81,10 +88,12 @@ def evaluate(logdir: Path,
             if video:
                 for vid in logdir.glob('episode*.mp4'):
                     wandb.run.summary[vid.stem] = wandb.Video(str(vid), fps=20, format="mp4")
+    if old_config is not None:
+        existing_env.reconfigure(config=old_config, capture_video=False)
 
 
 @measure_time()
-def create_env(task: AttrDict, capture_video: bool, seed: Optional[int]) -> planet.control.InGraphBatchEnv:
+def create_env(task: AttrDict, capture_video: bool, seed: Optional[int]) -> VectorHabitat:
     params = task.env_ctor._args[1]  # TODO: do this in a less hacky way
     params['capture_video'] = capture_video
     params['seed'] = seed
@@ -95,6 +104,24 @@ def create_env(task: AttrDict, capture_video: bool, seed: Optional[int]) -> plan
         config.TASK.MEASUREMENTS.append('TOP_DOWN_MAP')
     config.freeze()
     env = task.env_ctor()
+    return env
+
+
+@measure_time()
+def reconfigure_env(env: VectorHabitat, capture_video: bool = False, seed: Optional[int] = None) -> habitat.Config:
+    old_config: habitat.Config = env._config
+    config = old_config.clone()
+    config.defrost()
+    if capture_video and 'TOP_DOWN_MAP' not in config.TASK.MEASUREMENTS:
+        # Top-down map is expensive to compute, so we only enable it for evaluation.
+        config.TASK.MEASUREMENTS.append('TOP_DOWN_MAP')
+    config.freeze()
+    env.reconfigure(config=config, capture_video=capture_video, seed=seed)
+    return old_config
+
+
+@measure_time()
+def wrap_env(env: VectorHabitat, task: AttrDict) -> planet.control.InGraphBatchEnv:
     env = planet.control.wrappers.SelectObservations(env, task.observation_components)
     env = planet.control.wrappers.SelectMetrics(env, task.metrics)
     with tf.compat.v1.variable_scope('environment', use_resource=True):
