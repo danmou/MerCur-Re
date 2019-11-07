@@ -17,6 +17,7 @@ planet.test_collect_every = 2  # epochs per test data collection
 planet.num_test_episodes = 10  # episodes per test data collection (these are also used for evaluation)
 planet.train_steps = 100  # training batches per epoch
 planet.test_steps = 1  # test steps per epoch
+planet.log_summaries_every = 3  # epochs between summaries
 planet.max_epochs = 200  # maximum number of epochs
 planet.checkpoint_every = 5  # epochs between checkpoints
 planet.eval_every = 20  # epochs between evaluations
