@@ -341,6 +341,8 @@ def get_config(max_steps: Optional[Union[int, float]] = None,
         dataset = f'{get_config_dir()}/habitat/datasets/{dataset}.yaml'
     copyfile(task, Path(wandb.run.dir) / 'task.yaml')
     copyfile(dataset, Path(wandb.run.dir) / 'dataset.yaml')
+    wandb.save(f'{wandb.run.dir}/task.yaml')
+    wandb.save(f'{wandb.run.dir}/dataset.yaml')
     if not HabitatSimActions.has_action('TURN_ANGLE'):
         HabitatSimActions.extend_action_space('TURN_ANGLE')
     config = habitat.get_config([task, dataset], opts)

@@ -1,4 +1,6 @@
-# wrappers.py: Additional wrappers to supplement planet.control.wrappers
+# wrappers.py: Additional wrappers to supplement planet.control.wrappers.
+# Note: Classes with @gin.configurable decorator are unpicklable and hence can't be used with Habitat's VectorEnv, so
+# instead each class has an associated function that adds the gin-config arguments to a kwargs dict.
 #
 # (C) 2019, Daniel Mouritzen
 
@@ -84,10 +86,10 @@ def minimum_duration() -> Tuple[Type[MinimumDuration], Callable[[Dict[str, Any]]
 
 class AutomaticStop(Wrapper):
     """Removes the stop action from the action space and triggers it automatically when the goal is reached."""
-    def __init__(self, env: gym.Env, enable: bool, minimum_duration: int = 0) -> None:
+    def __init__(self, env: gym.Env, enable: bool, min_duration: int = 0) -> None:
         super().__init__(env)
         self._enable = enable
-        self._duration = minimum_duration
+        self._duration = min_duration
         self._step = 0
         if self._enable:
             self.action_space = gym.spaces.Discrete(self.env.action_space.n - 1)
@@ -108,7 +110,73 @@ class AutomaticStop(Wrapper):
 
 @gin.configurable(whitelist=['enable'])
 def automatic_stop(enable: bool = False) -> Tuple[Type[AutomaticStop], Callable[[Dict[str, Any]], Dict[str, Any]]]:
-    return AutomaticStop, lambda kwargs: {'enable': enable, 'minimum_duration': kwargs['min_duration']}
+    return AutomaticStop, lambda kwargs: {'enable': enable, 'min_duration': kwargs['min_duration']}
+
+
+class Curriculum(Wrapper):
+    """Rejects episodes longer than a gradually increasing threshold."""
+
+    def __init__(self,
+                 env: gym.Env,
+                 enabled: bool,
+                 start_threshold: float,
+                 initial_delay: int,
+                 increase_rate: float,
+                 ) -> None:
+        """
+        Args:
+            env: Environment.
+            start_threshold: Initial threshold in meters.
+            initial_delay: Number of episodes to wait before increasing threshold.
+            increase_rate: Rate of increase in meters per episode.
+        """
+        super().__init__(env)
+        self._enabled = enabled
+        self._episodes = -initial_delay
+        self._start_threshold = start_threshold
+        self._increase_rate = increase_rate
+
+    @property
+    def threshold(self) -> float:
+        return self._start_threshold + max(0.0, self._episodes * self._increase_rate)
+
+    @property
+    def episode_length(self) -> float:
+        return self.env.habitat_env.current_episode.info["geodesic_distance"]
+
+    def enable_curriculum(self, enable: bool = True) -> None:
+        self._enabled = enable
+
+    def reset(self, **kwargs: Any) -> Observations:
+        obs = self.env.reset(**kwargs)
+        if self._enabled:
+            count = 0
+            while self.episode_length > self.threshold:
+                logger.trace(f'Curriculum: Rejected episode with length {self.episode_length:.1f}m due to threshold '
+                             f'{self.threshold:.1f}m')
+                if count >= 200:
+                    logger.warning(f'Curriculum: Failed to find a suitable episode with threshold {self.threshold:.1f}m '
+                                   f'in 200 steps; increasing start_threshold to '
+                                   f'{self._start_threshold + self._increase_rate:.1f}m.')
+                    self._start_threshold += self._increase_rate
+                    count = 0
+                else:
+                    count += 1
+                obs = self.env.reset(**kwargs)
+            self._episodes += 1
+        return cast(Observations, obs)
+
+
+@gin.configurable(whitelist=['enabled', 'start_threshold', 'initial_delay', 'increase_rate'])
+def curriculum(enabled: bool = True,
+               start_threshold: float = 1.0,
+               initial_delay: int = 0,
+               increase_rate: float = 0.1,
+               ) -> Tuple[Type[Curriculum], Callable[[Dict[str, Any]], Dict[str, Any]]]:
+    return Curriculum, lambda kwargs: {'enabled': enabled,
+                                       'start_threshold': start_threshold,
+                                       'initial_delay': initial_delay,
+                                       'increase_rate': increase_rate}
 
 
 @gin.configurable(whitelist=[])

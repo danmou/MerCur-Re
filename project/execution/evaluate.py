@@ -8,6 +8,7 @@ from collections import namedtuple
 from pathlib import Path
 from typing import Callable, Dict, Optional, Tuple
 
+import gin
 import habitat
 import numpy as np
 import planet
@@ -90,6 +91,7 @@ def evaluate(logdir: Path,
                     wandb.run.summary[vid.stem] = wandb.Video(str(vid), fps=20, format="mp4")
     if old_config is not None:
         existing_env.reconfigure(config=old_config, capture_video=False)
+        existing_env.call_at(0, 'enable_curriculum', {'enable': gin.query_parameter('curriculum.enabled')})
 
 
 @measure_time()
@@ -122,6 +124,7 @@ def reconfigure_env(env: VectorHabitat, capture_video: bool = False, seed: Optio
 
 @measure_time()
 def wrap_env(env: VectorHabitat, task: AttrDict) -> planet.control.InGraphBatchEnv:
+    env.call_at(0, 'enable_curriculum', {'enable': False})
     env = planet.control.wrappers.SelectObservations(env, task.observation_components)
     env = planet.control.wrappers.SelectMetrics(env, task.metrics)
     with tf.compat.v1.variable_scope('environment', use_resource=True):
