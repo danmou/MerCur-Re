@@ -6,7 +6,7 @@ import functools
 import random
 from collections import namedtuple
 from pathlib import Path
-from typing import Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import gin
 import habitat
@@ -46,10 +46,11 @@ def evaluate(logdir: Path,
     collect_params = next(iter(config.collects.values()))  # We assume all collects have same task and planner
     if existing_env is None:
         env = create_env(collect_params.task, video, seed)
-        old_config = None
+        original_config = None
+        original_params = None
     else:
         env = existing_env
-        old_config = reconfigure_env(env, video, seed)
+        original_config, original_params = reconfigure_env(env, video, seed)
     env = wrap_env(env, collect_params.task)
     data = create_dummy_data(env, config.preprocess_fn)
     graph = create_graph(data, config)
@@ -89,8 +90,8 @@ def evaluate(logdir: Path,
             if video:
                 for vid in logdir.glob('episode*.mp4'):
                     wandb.run.summary[vid.stem] = wandb.Video(str(vid), fps=20, format="mp4")
-    if old_config is not None:
-        existing_env.reconfigure(config=old_config, capture_video=False)
+    if original_config is not None:
+        existing_env.reconfigure(config=original_config, **original_params)
         existing_env.call_at(0, 'enable_curriculum', {'enable': gin.query_parameter('curriculum.enabled')})
 
 
@@ -99,6 +100,7 @@ def create_env(task: AttrDict, capture_video: bool, seed: Optional[int]) -> Vect
     params = task.env_ctor._args[1]  # TODO: do this in a less hacky way
     params['capture_video'] = capture_video
     params['seed'] = seed
+    params['min_duration'] = 0
     config = params['config']
     config.defrost()
     if capture_video and 'TOP_DOWN_MAP' not in config.TASK.MEASUREMENTS:
@@ -110,16 +112,20 @@ def create_env(task: AttrDict, capture_video: bool, seed: Optional[int]) -> Vect
 
 
 @measure_time()
-def reconfigure_env(env: VectorHabitat, capture_video: bool = False, seed: Optional[int] = None) -> habitat.Config:
-    old_config: habitat.Config = env._config
-    config = old_config.clone()
+def reconfigure_env(env: VectorHabitat,
+                    capture_video: bool = False,
+                    seed: Optional[int] = None,
+                    ) -> Tuple[habitat.Config, Dict[str, Any]]:
+    original_config: habitat.Config = env._config
+    original_params: Dict[str, Any] = {'capture_video': env._capture_video, 'min_duration': env._min_duration}
+    config = original_config.clone()
     config.defrost()
     if capture_video and 'TOP_DOWN_MAP' not in config.TASK.MEASUREMENTS:
         # Top-down map is expensive to compute, so we only enable it for evaluation.
         config.TASK.MEASUREMENTS.append('TOP_DOWN_MAP')
     config.freeze()
-    env.reconfigure(config=config, capture_video=capture_video, seed=seed)
-    return old_config
+    env.reconfigure(config=config, capture_video=capture_video, seed=seed, min_duration=0)
+    return original_config, original_params
 
 
 @measure_time()

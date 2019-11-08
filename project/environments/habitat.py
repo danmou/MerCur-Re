@@ -21,6 +21,7 @@ from habitat.tasks.nav.nav import NavigationEpisode, SimulatorTaskAction
 from habitat.utils.visualizations.utils import images_to_video, observations_to_image
 from habitat_sim.agent.controls.controls import ActuationSpec
 from habitat_sim.agent.controls.default_controls import LookLeft
+from loguru import logger
 
 from project.util import capture_output, get_config_dir, measure_time
 
@@ -120,12 +121,15 @@ class Habitat(habitat.RLEnv):
         self._max_duration = max_duration
         self._step_count = 0
 
-    def reconfigure(self, config: habitat.Config, capture_video: Optional[bool] = None, seed: Optional[int] = None):
+    def reconfigure(self,
+                    config: habitat.Config,
+                    capture_video: Optional[bool] = None,
+                    seed: Optional[int] = None,
+                    min_duration: Optional[int] = None,
+                    max_duration: Optional[int] = None,
+                    ) -> None:
         if capture_video is not None:
             self._capture_video = capture_video
-        if seed is not None:
-            random.seed(seed)
-            np.random.seed(seed)
         if seed is not None:
             # This is needed for reproducible episode shuffling
             random.seed(seed)
@@ -134,6 +138,10 @@ class Habitat(habitat.RLEnv):
             self.habitat_env.reconfigure(config)
         if seed is not None:
             self.seed(seed)
+        if min_duration is not None:
+            self._min_duration = min_duration
+        if max_duration is not None:
+            self._max_duration = max_duration
 
     def get_reward_range(self) -> Tuple[float, float]:
         return self._reward_function.get_reward_range()
@@ -188,6 +196,8 @@ class Habitat(habitat.RLEnv):
             info['taken_action'] = action
             reward = sum_reward
         obs = self._update_keys(obs)
+        if done:
+            logger.debug(f'Episode finished at step {self._step_count}.')
         if self._capture_video:
             # upscale image to make the resulting video more viewable
             new_obs = {'rgb': np.repeat(np.repeat(obs['image'], 4, axis=0), 4, axis=1)}
