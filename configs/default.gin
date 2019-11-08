@@ -64,8 +64,8 @@ planet_habitat_task.wrappers = [@curriculum(),
                                 @action_repeat()]
 curriculum.enabled = True
 curriculum.start_threshold = 1.5  # Initial threshold in meters.
-curriculum.initial_delay = 100  # Number of episodes to wait before increasing threshold.
-curriculum.increase_rate = 0.1  # Rate of increase in meters per episode.
+curriculum.initial_delay = 200  # Number of episodes to wait before increasing threshold.
+curriculum.increase_rate = 0.05  # Rate of increase in meters per episode.
 Habitat.task = 'pointnav'
 Habitat.dataset = 'habitat_test'
 Habitat.gpu_id = 0

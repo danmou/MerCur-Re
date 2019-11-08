@@ -152,12 +152,12 @@ class Curriculum(Wrapper):
         if self._enabled:
             count = 0
             while self.episode_length > self.threshold:
-                logger.trace(f'Curriculum: Rejected episode with length {self.episode_length:.1f}m due to threshold '
-                             f'{self.threshold:.1f}m')
-                if count >= 200:
-                    logger.warning(f'Curriculum: Failed to find a suitable episode with threshold {self.threshold:.1f}m '
-                                   f'in 200 steps; increasing start_threshold to '
-                                   f'{self._start_threshold + self._increase_rate:.1f}m.')
+                logger.trace(f'Curriculum: Rejected episode with length {self.episode_length:.2f}m due to threshold '
+                             f'{self.threshold:.2f}m')
+                if count >= 500:
+                    logger.warning(f'Curriculum: Failed to find a suitable episode with threshold {self.threshold:.2f}m '
+                                   f'in 500 steps; increasing start_threshold to '
+                                   f'{self._start_threshold + self._increase_rate:.2f}m.')
                     self._start_threshold += self._increase_rate
                     count = 0
                 else:
