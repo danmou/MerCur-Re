@@ -20,25 +20,25 @@ import tensorflow as tf
 
 
 def image_strip_summary(name, images, max_length=100, max_batch=10):
-  """Create an image summary that places frames of a video tensor side by side.
+    """Create an image summary that places frames of a video tensor side by side.
 
-  Args:
-    name: Name tag of the summary.
-    images: Tensor with the dimensions batch, time, height, width, channels.
-    max_length: Maximum number of frames per sequence to include.
-    max_batch: Maximum number of sequences to include.
+    Args:
+      name: Name tag of the summary.
+      images: Tensor with the dimensions batch, time, height, width, channels.
+      max_length: Maximum number of frames per sequence to include.
+      max_batch: Maximum number of sequences to include.
 
-  Returns:
-    Summary string tensor.
-  """
-  if max_batch:
-    images = images[:max_batch]
-  if max_length:
-    images = images[:, :max_length]
-  if images.dtype == tf.uint8:
-    images = tf.to_float(images) / 255.0
-  length, width = tf.shape(images)[1], tf.shape(images)[3]
-  images = tf.transpose(images, [0, 2, 1, 3, 4])
-  images = tf.reshape(images, [1, -1, length * width, 3])
-  images = tf.clip_by_value(images, 0., 1.)
-  return tf.compat.v1.summary.image(name, images)
+    Returns:
+      Summary string tensor.
+    """
+    if max_batch:
+        images = images[:max_batch]
+    if max_length:
+        images = images[:, :max_length]
+    if images.dtype == tf.uint8:
+        images = tf.to_float(images) / 255.0
+    length, width = tf.shape(images)[1], tf.shape(images)[3]
+    images = tf.transpose(images, [0, 2, 1, 3, 4])
+    images = tf.reshape(images, [1, -1, length * width, 3])
+    images = tf.clip_by_value(images, 0., 1.)
+    return tf.compat.v1.summary.image(name, images)

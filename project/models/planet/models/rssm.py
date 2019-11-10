@@ -24,112 +24,112 @@ from project.models.planet.models import base
 
 
 class RSSM(base.Base):
-  """Deterministic and stochastic state model.
+    """Deterministic and stochastic state model.
 
-  The stochastic latent is computed from the hidden state at the same time
-  step. If an observation is present, the posterior latent is compute from both
-  the hidden state and the observation.
+    The stochastic latent is computed from the hidden state at the same time
+    step. If an observation is present, the posterior latent is compute from both
+    the hidden state and the observation.
 
-  Prior:    Posterior:
+    Prior:    Posterior:
 
-  (a)       (a)
-     \         \
-      v         v
-  [h]->[h]  [h]->[h]
-      ^ |       ^ :
-     /  v      /  v
-  (s)  (s)  (s)  (s)
-                  ^
-                  :
-                 (o)
-  """
+    (a)       (a)
+       \         \
+        v         v
+    [h]->[h]  [h]->[h]
+        ^ |       ^ :
+       /  v      /  v
+    (s)  (s)  (s)  (s)
+                    ^
+                    :
+                   (o)
+    """
 
-  def __init__(
-      self, state_size, belief_size, embed_size,
-      mean_only=False, min_stddev=0.1, activation=tf.nn.elu,
-      num_layers=1):
-    self._state_size = state_size
-    self._belief_size = belief_size
-    self._embed_size = embed_size
-    self._cell = tf.contrib.rnn.GRUBlockCell(self._belief_size)
-    self._kwargs = dict(units=self._embed_size, activation=activation)
-    self._mean_only = mean_only
-    self._min_stddev = min_stddev
-    self._num_layers = num_layers
-    super(RSSM, self).__init__(
-        tf.compat.v1.make_template('transition', self._transition),
-        tf.compat.v1.make_template('posterior', self._posterior))
+    def __init__(
+            self, state_size, belief_size, embed_size,
+            mean_only=False, min_stddev=0.1, activation=tf.nn.elu,
+            num_layers=1):
+        self._state_size = state_size
+        self._belief_size = belief_size
+        self._embed_size = embed_size
+        self._cell = tf.contrib.rnn.GRUBlockCell(self._belief_size)
+        self._kwargs = dict(units=self._embed_size, activation=activation)
+        self._mean_only = mean_only
+        self._min_stddev = min_stddev
+        self._num_layers = num_layers
+        super(RSSM, self).__init__(
+            tf.compat.v1.make_template('transition', self._transition),
+            tf.compat.v1.make_template('posterior', self._posterior))
 
-  @property
-  def state_size(self):
-    return {
-        'mean': self._state_size,
-        'stddev': self._state_size,
-        'sample': self._state_size,
-        'belief': self._belief_size,
-    }
+    @property
+    def state_size(self):
+        return {
+            'mean': self._state_size,
+            'stddev': self._state_size,
+            'sample': self._state_size,
+            'belief': self._belief_size,
+        }
 
-  def dist_from_state(self, state, mask=None):
-    """Extract the latent distribution from a prior or posterior state."""
-    if mask is not None:
-      stddev = tools.mask(state['stddev'], mask, value=1)
-    else:
-      stddev = state['stddev']
-    dist = tfd.MultivariateNormalDiag(state['mean'], stddev)
-    return dist
+    def dist_from_state(self, state, mask=None):
+        """Extract the latent distribution from a prior or posterior state."""
+        if mask is not None:
+            stddev = tools.mask(state['stddev'], mask, value=1)
+        else:
+            stddev = state['stddev']
+        dist = tfd.MultivariateNormalDiag(state['mean'], stddev)
+        return dist
 
-  def features_from_state(self, state):
-    """Extract features for the decoder network from a prior or posterior."""
-    return tf.concat([state['sample'], state['belief']], -1)
+    def features_from_state(self, state):
+        """Extract features for the decoder network from a prior or posterior."""
+        return tf.concat([state['sample'], state['belief']], -1)
 
-  def divergence_from_states(self, lhs, rhs, mask=None):
-    """Compute the divergence measure between two states."""
-    lhs = self.dist_from_state(lhs, mask)
-    rhs = self.dist_from_state(rhs, mask)
-    divergence = tfd.kl_divergence(lhs, rhs)
-    if mask is not None:
-      divergence = tools.mask(divergence, mask)
-    return divergence
+    def divergence_from_states(self, lhs, rhs, mask=None):
+        """Compute the divergence measure between two states."""
+        lhs = self.dist_from_state(lhs, mask)
+        rhs = self.dist_from_state(rhs, mask)
+        divergence = tfd.kl_divergence(lhs, rhs)
+        if mask is not None:
+            divergence = tools.mask(divergence, mask)
+        return divergence
 
-  def _transition(self, prev_state, prev_action, zero_obs):
-    """Compute prior next state by applying the transition dynamics."""
-    hidden = tf.concat([prev_state['sample'], prev_action], -1)
-    for _ in range(self._num_layers):
-      hidden = tf.layers.dense(hidden, **self._kwargs)
-    hidden, _ = self._cell(hidden, prev_state['belief'])  # For GRU cell, state and output are the same
-    belief = hidden
-    for _ in range(self._num_layers):
-      hidden = tf.layers.dense(hidden, **self._kwargs)
-    mean = tf.layers.dense(hidden, self._state_size, None)
-    stddev = tf.layers.dense(hidden, self._state_size, tf.nn.softplus)
-    stddev += self._min_stddev
-    if self._mean_only:
-      sample = mean
-    else:
-      sample = tfd.MultivariateNormalDiag(mean, stddev).sample()
-    return {
-        'mean': mean,
-        'stddev': stddev,
-        'sample': sample,
-        'belief': belief,
-    }
+    def _transition(self, prev_state, prev_action, zero_obs):
+        """Compute prior next state by applying the transition dynamics."""
+        hidden = tf.concat([prev_state['sample'], prev_action], -1)
+        for _ in range(self._num_layers):
+            hidden = tf.layers.dense(hidden, **self._kwargs)
+        hidden, _ = self._cell(hidden, prev_state['belief'])  # For GRU cell, state and output are the same
+        belief = hidden
+        for _ in range(self._num_layers):
+            hidden = tf.layers.dense(hidden, **self._kwargs)
+        mean = tf.layers.dense(hidden, self._state_size, None)
+        stddev = tf.layers.dense(hidden, self._state_size, tf.nn.softplus)
+        stddev += self._min_stddev
+        if self._mean_only:
+            sample = mean
+        else:
+            sample = tfd.MultivariateNormalDiag(mean, stddev).sample()
+        return {
+            'mean': mean,
+            'stddev': stddev,
+            'sample': sample,
+            'belief': belief,
+        }
 
-  def _posterior(self, prev_state, prev_action, obs):
-    """Compute posterior state from previous state and current observation."""
-    prior = self._transition_tpl(prev_state, prev_action, tf.zeros_like(obs))
-    hidden = tf.concat([prior['belief'], obs], -1)
-    for _ in range(self._num_layers):
-      hidden = tf.layers.dense(hidden, **self._kwargs)
-    mean = tf.layers.dense(hidden, self._state_size, None)
-    stddev = tf.layers.dense(hidden, self._state_size, tf.nn.softplus)
-    stddev += self._min_stddev
-    if self._mean_only:
-      sample = mean
-    else:
-      sample = tfd.MultivariateNormalDiag(mean, stddev).sample()
-    return {
-        'mean': mean,
-        'stddev': stddev,
-        'sample': sample,
-        'belief': prior['belief'],
-    }
+    def _posterior(self, prev_state, prev_action, obs):
+        """Compute posterior state from previous state and current observation."""
+        prior = self._transition_tpl(prev_state, prev_action, tf.zeros_like(obs))
+        hidden = tf.concat([prior['belief'], obs], -1)
+        for _ in range(self._num_layers):
+            hidden = tf.layers.dense(hidden, **self._kwargs)
+        mean = tf.layers.dense(hidden, self._state_size, None)
+        stddev = tf.layers.dense(hidden, self._state_size, tf.nn.softplus)
+        stddev += self._min_stddev
+        if self._mean_only:
+            sample = mean
+        else:
+            sample = tfd.MultivariateNormalDiag(mean, stddev).sample()
+        return {
+            'mean': mean,
+            'stddev': stddev,
+            'sample': sample,
+            'belief': prior['belief'],
+        }

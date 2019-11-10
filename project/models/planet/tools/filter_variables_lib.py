@@ -22,40 +22,40 @@ import tensorflow as tf
 
 
 def filter_variables(include=None, exclude=None):
-  # Check arguments.
-  if include is None:
-    include = (r'.*',)
-  if exclude is None:
-    exclude = ()
-  if not isinstance(include, (tuple, list)):
-    include = (include,)
-  if not isinstance(exclude, (tuple, list)):
-    exclude = (exclude,)
-  # Compile regexes.
-  include = [re.compile(regex) for regex in include]
-  exclude = [re.compile(regex) for regex in exclude]
-  variables = tf.compat.v1.global_variables()
-  if not variables:
-    raise RuntimeError('There are no variables to filter.')
-  # Check regexes.
-  for regex in include:
-    message = "Regex r'{}' does not match any variables in the graph.\n"
-    message += 'All variables:\n'
-    message += '\n'.join('- {}'.format(var.name) for var in variables)
-    if not any(regex.match(variable.name) for variable in variables):
-      raise RuntimeError(message.format(regex.pattern))
-  # Filter variables.
-  filtered = []
-  for variable in variables:
-    if not any(regex.match(variable.name) for regex in include):
-      continue
-    if any(regex.match(variable.name) for regex in exclude):
-      continue
-    filtered.append(variable)
-  # Check result.
-  if not filtered:
-    message = 'No variables left after filtering.'
-    message += '\nIncludes:\n' + '\n'.join(regex.pattern for regex in include)
-    message += '\nExcludes:\n' + '\n'.join(regex.pattern for regex in exclude)
-    raise RuntimeError(message)
-  return filtered
+    # Check arguments.
+    if include is None:
+        include = (r'.*',)
+    if exclude is None:
+        exclude = ()
+    if not isinstance(include, (tuple, list)):
+        include = (include,)
+    if not isinstance(exclude, (tuple, list)):
+        exclude = (exclude,)
+    # Compile regexes.
+    include = [re.compile(regex) for regex in include]
+    exclude = [re.compile(regex) for regex in exclude]
+    variables = tf.compat.v1.global_variables()
+    if not variables:
+        raise RuntimeError('There are no variables to filter.')
+    # Check regexes.
+    for regex in include:
+        message = "Regex r'{}' does not match any variables in the graph.\n"
+        message += 'All variables:\n'
+        message += '\n'.join('- {}'.format(var.name) for var in variables)
+        if not any(regex.match(variable.name) for variable in variables):
+            raise RuntimeError(message.format(regex.pattern))
+    # Filter variables.
+    filtered = []
+    for variable in variables:
+        if not any(regex.match(variable.name) for regex in include):
+            continue
+        if any(regex.match(variable.name) for regex in exclude):
+            continue
+        filtered.append(variable)
+    # Check result.
+    if not filtered:
+        message = 'No variables left after filtering.'
+        message += '\nIncludes:\n' + '\n'.join(regex.pattern for regex in include)
+        message += '\nExcludes:\n' + '\n'.join(regex.pattern for regex in exclude)
+        raise RuntimeError(message)
+    return filtered

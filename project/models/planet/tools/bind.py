@@ -19,16 +19,16 @@ from __future__ import print_function
 
 class bind(object):
 
-  def __init__(self, fn, *args, **kwargs):
-    self._fn = fn
-    self._args = args
-    self._kwargs = kwargs
+    def __init__(self, fn, *args, **kwargs):
+        self._fn = fn
+        self._args = args
+        self._kwargs = kwargs
 
-  def __call__(self, *args, **kwargs):
-    args_ = self._args + args
-    kwargs_ = self._kwargs.copy()
-    kwargs_.update(kwargs)
-    return self._fn(*args_, **kwargs_)
+    def __call__(self, *args, **kwargs):
+        args_ = self._args + args
+        kwargs_ = self._kwargs.copy()
+        kwargs_.update(kwargs)
+        return self._fn(*args_, **kwargs_)
 
-  def __repr__(self):
-    return 'bind({})'.format(self._fn.__name__)
+    def __repr__(self):
+        return 'bind({})'.format(self._fn.__name__)

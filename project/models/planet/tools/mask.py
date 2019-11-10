@@ -20,37 +20,37 @@ import tensorflow as tf
 
 
 def mask(tensor, mask=None, length=None, value=0, debug=False):
-  """Set padding elements of a batch of sequences to a constant.
+    """Set padding elements of a batch of sequences to a constant.
 
-  Useful for setting padding elements to zero before summing along the time
-  dimension, or for preventing infinite results in padding elements. Either
-  mask or length must be provided.
+    Useful for setting padding elements to zero before summing along the time
+    dimension, or for preventing infinite results in padding elements. Either
+    mask or length must be provided.
 
-  Args:
-    tensor: Tensor of sequences.
-    mask: Boolean mask of valid indices.
-    length: Batch of sequence lengths.
-    value: Value to write into padding elemnts.
-    debug: Test for infinite values; slows down performance.
+    Args:
+      tensor: Tensor of sequences.
+      mask: Boolean mask of valid indices.
+      length: Batch of sequence lengths.
+      value: Value to write into padding elemnts.
+      debug: Test for infinite values; slows down performance.
 
-  Raises:
-    KeyError: If both or non of `mask` and `length` are provided.
+    Raises:
+      KeyError: If both or non of `mask` and `length` are provided.
 
-  Returns:
-    Masked sequences.
-  """
-  if len([x for x in (mask, length) if x is not None]) != 1:
-    raise KeyError('Exactly one of mask and length must be provided.')
-  with tf.name_scope('mask'):
-    if mask is None:
-      range_ = tf.range(tensor.shape[1].value)
-      mask = range_[None, :] < length[:, None]
-    batch_dims = mask.shape.ndims
-    while tensor.shape.ndims > mask.shape.ndims:
-      mask = mask[..., None]
-    multiples = [1] * batch_dims + tensor.shape[batch_dims:].as_list()
-    mask = tf.tile(mask, multiples)
-    masked = tf.where(mask, tensor, value * tf.ones_like(tensor))
-    if debug:
-      masked = tf.check_numerics(masked, 'masked')
-    return masked
+    Returns:
+      Masked sequences.
+    """
+    if len([x for x in (mask, length) if x is not None]) != 1:
+        raise KeyError('Exactly one of mask and length must be provided.')
+    with tf.name_scope('mask'):
+        if mask is None:
+            range_ = tf.range(tensor.shape[1].value)
+            mask = range_[None, :] < length[:, None]
+        batch_dims = mask.shape.ndims
+        while tensor.shape.ndims > mask.shape.ndims:
+            mask = mask[..., None]
+        multiples = [1] * batch_dims + tensor.shape[batch_dims:].as_list()
+        mask = tf.tile(mask, multiples)
+        masked = tf.where(mask, tensor, value * tf.ones_like(tensor))
+        if debug:
+            masked = tf.check_numerics(masked, 'masked')
+        return masked

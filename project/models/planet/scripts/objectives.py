@@ -20,6 +20,6 @@ import tensorflow as tf
 
 
 def reward(state, graph, params):
-  features = graph.cell.features_from_state(state)
-  reward = graph.heads.reward(features).mean()
-  return tf.reduce_sum(reward, 1)
+    features = graph.cell.features_from_state(state)
+    reward = graph.heads.reward(features).mean()
+    return tf.reduce_sum(reward, 1)

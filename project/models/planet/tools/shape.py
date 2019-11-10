@@ -20,8 +20,8 @@ import tensorflow as tf
 
 
 def shape(tensor):
-  static = tensor.get_shape().as_list()
-  dynamic = tf.unstack(tf.shape(tensor))
-  assert len(static) == len(dynamic)
-  combined = [d if s is None else s for s, d in zip(static, dynamic)]
-  return combined
+    static = tensor.get_shape().as_list()
+    dynamic = tf.unstack(tf.shape(tensor))
+    assert len(static) == len(dynamic)
+    combined = [d if s is None else s for s, d in zip(static, dynamic)]
+    return combined

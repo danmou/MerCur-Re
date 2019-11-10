@@ -23,29 +23,29 @@ import tensorflow as tf
 
 
 def count_weights(scope=None, exclude=None, graph=None):
-  """Count learnable parameters.
+    """Count learnable parameters.
 
-  Args:
-    scope: Resrict the count to a variable scope.
-    exclude: Regex to match variable names to exclude.
-    graph: Operate on a graph other than the current default graph.
+    Args:
+      scope: Resrict the count to a variable scope.
+      exclude: Regex to match variable names to exclude.
+      graph: Operate on a graph other than the current default graph.
 
-  Returns:
-    Number of learnable parameters as integer.
-  """
-  if scope:
-    scope = scope if scope.endswith('/') else scope + '/'
-  graph = graph or tf.compat.v1.get_default_graph()
-  vars_ = graph.get_collection(tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES)
-  if scope:
-    vars_ = [var for var in vars_ if var.name.startswith(scope)]
-  if exclude:
-    exclude = re.compile(exclude)
-    vars_ = [var for var in vars_ if not exclude.match(var.name)]
-  shapes = []
-  for var in vars_:
-    if not var.shape.is_fully_defined():
-      message = "Trainable variable '{}' has undefined shape '{}'."
-      raise ValueError(message.format(var.name, var.shape))
-    shapes.append(var.shape.as_list())
-  return int(sum(np.prod(shape) for shape in shapes))
+    Returns:
+      Number of learnable parameters as integer.
+    """
+    if scope:
+        scope = scope if scope.endswith('/') else scope + '/'
+    graph = graph or tf.compat.v1.get_default_graph()
+    vars_ = graph.get_collection(tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES)
+    if scope:
+        vars_ = [var for var in vars_ if var.name.startswith(scope)]
+    if exclude:
+        exclude = re.compile(exclude)
+        vars_ = [var for var in vars_ if not exclude.match(var.name)]
+    shapes = []
+    for var in vars_:
+        if not var.shape.is_fully_defined():
+            message = "Trainable variable '{}' has undefined shape '{}'."
+            raise ValueError(message.format(var.name, var.shape))
+        shapes.append(var.shape.as_list())
+    return int(sum(np.prod(shape) for shape in shapes))
