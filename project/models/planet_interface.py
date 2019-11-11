@@ -19,7 +19,8 @@ from project.environments import habitat, wrappers
 from project.models.planet.scripts.configs import tasks_lib
 from project.models.planet.scripts.tasks import Task as PlanetTask
 from project.models.planet.tools import AttrDict
-from project.util import Timer, capture_output
+from project.util.logging import capture_output
+from project.util.timing import Timer
 
 
 @gin.configurable('planet')

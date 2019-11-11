@@ -11,7 +11,7 @@ import click
 import wandb
 
 from project.main import main_configure
-from project.util import get_config_dir
+from project.util.config import get_config_dir
 
 
 def with_global_options(func: Callable[..., None]) -> Callable[..., None]:

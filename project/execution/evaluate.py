@@ -22,7 +22,8 @@ from project.environments.habitat import VectorHabitat
 from project.models.planet.scripts.configs import default as planet_config
 from project.models.planet.training.define_model import build_network
 from project.models.planet_interface import AttrDict, PlanetParams, create_tf_session
-from project.util import PrettyPrinter, Statistics, Timer, measure_time
+from project.util import PrettyPrinter, Statistics
+from project.util.timing import Timer, measure_time
 
 
 def evaluate(logdir: Path,

@@ -17,7 +17,7 @@ from loguru import logger
 from tensorflow.python.util import deprecation
 
 from project.execution import evaluate, train
-from project.logging_utils import init_logging
+from project.util.logging import init_logging
 
 
 @gin.configurable('main', whitelist=['base_logdir'])

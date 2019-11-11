@@ -23,7 +23,9 @@ from habitat_sim.agent.controls.controls import ActuationSpec
 from habitat_sim.agent.controls.default_controls import LookLeft
 from loguru import logger
 
-from project.util import capture_output, get_config_dir, measure_time
+from project.util.config import get_config_dir
+from project.util.logging import capture_output
+from project.util.timing import measure_time
 
 from .rewards import RewardFunction
 
