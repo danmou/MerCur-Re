@@ -16,7 +16,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability import distributions as tfd
 
-from project.models.planet import tools
+from project.util import planet as tools
 
 
 def encoder(obs):

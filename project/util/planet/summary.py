@@ -18,8 +18,8 @@ import numpy as np
 import tensorflow as tf
 from matplotlib.ticker import AutoMinorLocator, MultipleLocator
 
-from project.models.planet.tools import count_dataset, gif_summary, image_strip_summary
-from project.models.planet.tools import shape as shapelib
+from project.util.planet import count_dataset, gif_summary, image_strip_summary
+from project.util.planet import shape as shapelib
 
 matplotlib.use('Agg')
 

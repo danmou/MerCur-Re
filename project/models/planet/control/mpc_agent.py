@@ -15,7 +15,7 @@
 import tensorflow as tf
 from tensorflow_probability import distributions as tfd
 
-from project.models.planet.tools import nested
+from project.util.planet import nested
 
 
 class MPCAgent(object):

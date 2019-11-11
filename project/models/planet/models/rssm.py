@@ -15,8 +15,8 @@
 import tensorflow as tf
 from tensorflow_probability import distributions as tfd
 
-from project.models.planet import tools
 from project.models.planet.models import base
+from project.util import planet as tools
 
 
 class RSSM(base.Base):

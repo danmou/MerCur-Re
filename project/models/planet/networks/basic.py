@@ -17,7 +17,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_probability import distributions as tfd
 
-from project.models.planet import tools
+from project.util import planet as tools
 
 
 def feed_forward(

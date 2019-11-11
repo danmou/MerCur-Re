@@ -14,15 +14,17 @@
 
 import collections
 
+import gym
 import numpy as np
 
-from project.models.planet import control, tools
+from project.environments import wrappers
+from project.util import planet as tools
 
 Task = collections.namedtuple(
     'Task', 'name, env_ctor, max_length, state_components, observation_components, metrics')
 
 
-def cartpole_balance(config, params):
+def cartpole_balance(config: tools.AttrDict, params: tools.AttrDict) -> Task:
     action_repeat = params.get('action_repeat', 8)
     max_length = 1000 // action_repeat
     state_components = ['reward', 'position', 'velocity']
@@ -33,7 +35,7 @@ def cartpole_balance(config, params):
     return Task('cartpole_balance', env_ctor, max_length, state_components, observation_components, [])
 
 
-def cartpole_swingup(config, params):
+def cartpole_swingup(config: tools.AttrDict, params: tools.AttrDict) -> Task:
     action_repeat = params.get('action_repeat', 8)
     max_length = 1000 // action_repeat
     state_components = ['reward', 'position', 'velocity']
@@ -44,7 +46,7 @@ def cartpole_swingup(config, params):
     return Task('cartpole_swingup', env_ctor, max_length, state_components, observation_components, [])
 
 
-def finger_spin(config, params):
+def finger_spin(config: tools.AttrDict, params: tools.AttrDict) -> Task:
     action_repeat = params.get('action_repeat', 2)
     max_length = 1000 // action_repeat
     state_components = ['reward', 'position', 'velocity', 'touch']
@@ -54,7 +56,7 @@ def finger_spin(config, params):
     return Task('finger_spin', env_ctor, max_length, state_components, observation_components, [])
 
 
-def cheetah_run(config, params):
+def cheetah_run(config: tools.AttrDict, params: tools.AttrDict) -> Task:
     action_repeat = params.get('action_repeat', 4)
     max_length = 1000 // action_repeat
     state_components = ['reward', 'position', 'velocity']
@@ -64,7 +66,7 @@ def cheetah_run(config, params):
     return Task('cheetah_run', env_ctor, max_length, state_components, observation_components, [])
 
 
-def cup_catch(config, params):
+def cup_catch(config: tools.AttrDict, params: tools.AttrDict) -> Task:
     action_repeat = params.get('action_repeat', 4)
     max_length = 1000 // action_repeat
     state_components = ['reward', 'position', 'velocity']
@@ -75,7 +77,7 @@ def cup_catch(config, params):
     return Task('cup_catch', env_ctor, max_length, state_components, observation_components, [])
 
 
-def walker_walk(config, params):
+def walker_walk(config: tools.AttrDict, params: tools.AttrDict) -> Task:
     action_repeat = params.get('action_repeat', 2)
     max_length = 1000 // action_repeat
     state_components = ['reward', 'height', 'orientations', 'velocity']
@@ -85,7 +87,7 @@ def walker_walk(config, params):
     return Task('walker_walk', env_ctor, max_length, state_components, observation_components, [])
 
 
-def reacher_easy(config, params):
+def reacher_easy(config: tools.AttrDict, params: tools.AttrDict) -> Task:
     action_repeat = params.get('action_repeat', 4)
     max_length = 1000 // action_repeat
     state_components = ['reward', 'position', 'velocity', 'to_target']
@@ -95,7 +97,7 @@ def reacher_easy(config, params):
     return Task('reacher_easy', env_ctor, max_length, state_components, observation_components, [])
 
 
-def gym_cheetah(config, params):
+def gym_cheetah(config: tools.AttrDict, params: tools.AttrDict) -> Task:
     # Works with `isolate_envs: process`.
     action_repeat = params.get('action_repeat', 1)
     max_length = 1000 // action_repeat
@@ -107,7 +109,7 @@ def gym_cheetah(config, params):
     return Task('gym_cheetah', env_ctor, max_length, state_components, observation_components, [])
 
 
-def gym_racecar(config, params):
+def gym_racecar(config: tools.AttrDict, params: tools.AttrDict) -> Task:
     # Works with `isolate_envs: thread`.
     action_repeat = params.get('action_repeat', 1)
     max_length = 1000 // action_repeat
@@ -119,39 +121,36 @@ def gym_racecar(config, params):
     return Task('gym_racing', env_ctor, max_length, state_components, observation_components, [])
 
 
-def _dm_control_env(
-        action_repeat, max_length, domain, task, params, normalize=False,
-        camera_id=None):
-    if isinstance(domain, str):
-        from dm_control import suite
-        env = suite.load(domain, task)
-    else:
-        assert task is None
-        env = domain()
-    if camera_id is None:
-        camera_id = int(params.get('camera_id', 0))
-    env = control.wrappers.DeepMindWrapper(env, (64, 64), camera_id=camera_id)
-    env = control.wrappers.ActionRepeat(env, action_repeat)
+def _dm_control_env(action_repeat: int,
+                    max_length: int,
+                    domain: str,
+                    task: str,
+                    params: tools.AttrDict,
+                    normalize: bool = False) -> gym.Env:
+    from dm_control import suite
+    env = suite.load(domain, task)
+    camera_id = int(params.get('camera_id', 0))
+    env = wrappers.DeepMindWrapper(env, (64, 64), camera_id=camera_id)
+    env = wrappers.ActionRepeat(env, action_repeat)
     if normalize:
-        env = control.wrappers.NormalizeActions(env)
-    env = control.wrappers.MaximumDuration(env, max_length)
-    env = control.wrappers.PixelObservations(env, (64, 64), np.uint8, 'image')
-    env = control.wrappers.ConvertTo32Bit(env)
+        env = wrappers.NormalizeActions(env)
+    env = wrappers.MaximumDuration(env, max_length)
+    env = wrappers.PixelObservations(env, (64, 64), np.uint8, 'image')
+    env = wrappers.ConvertTo32Bit(env)
     return env
 
 
-def _gym_env(action_repeat, min_length, max_length, name, obs_is_image=False):
-    import gym
+def _gym_env(action_repeat: int, min_length: int, max_length: int, name: str, obs_is_image: bool = False) -> gym.Env:
     env = gym.make(name)
-    env = control.wrappers.ActionRepeat(env, action_repeat)
-    env = control.wrappers.NormalizeActions(env)
-    env = control.wrappers.MinimumDuration(env, min_length)
-    env = control.wrappers.MaximumDuration(env, max_length)
+    env = wrappers.ActionRepeat(env, action_repeat)
+    env = wrappers.NormalizeActions(env)
+    env = wrappers.MinimumDuration(env, min_length)
+    env = wrappers.MaximumDuration(env, max_length)
     if obs_is_image:
-        env = control.wrappers.ObservationDict(env, 'image')
-        env = control.wrappers.ObservationToRender(env)
+        env = wrappers.ObservationDict(env, 'image')
+        env = wrappers.ObservationToRender(env)
     else:
-        env = control.wrappers.ObservationDict(env, 'state')
-    env = control.wrappers.PixelObservations(env, (64, 64), np.uint8, 'image')
-    env = control.wrappers.ConvertTo32Bit(env)
+        env = wrappers.ObservationDict(env, 'state')
+    env = wrappers.PixelObservations(env, (64, 64), np.uint8, 'image')
+    env = wrappers.ConvertTo32Bit(env)
     return env

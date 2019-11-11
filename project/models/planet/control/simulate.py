@@ -16,9 +16,9 @@
 
 import tensorflow as tf
 
-from project.models.planet import tools
 from project.models.planet.control import batch_env, in_graph_batch_env, mpc_agent
-from project.models.planet.tools import streaming_mean
+from project.util import planet as tools
+from project.util.planet import streaming_mean
 
 
 def simulate(
@@ -92,7 +92,7 @@ def collect_rollouts(step, env, duration, agent_config):
 
 def define_batch_env(env):
     with tf.compat.v1.variable_scope('environments'):
-        env = batch_env.BatchEnv([env], blocking=True)
+        env = batch_env.BatchEnv([env])
         env = in_graph_batch_env.InGraphBatchEnv(env)
     return env
 

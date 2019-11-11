@@ -81,7 +81,6 @@ class AttrDict(dict):  # collections.OrderedDict
     def untouched(self):
         return sorted(set(self.keys()) - self._touched)
 
-    @property
     @contextlib.contextmanager
     def unlocked(self):
         self.unlock()

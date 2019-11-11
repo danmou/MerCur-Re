@@ -22,7 +22,7 @@ import numpy as np
 import tensorflow as tf
 from scipy.ndimage import interpolation
 
-from project.models.planet.tools import attr_dict, chunk_sequence
+from project.util.planet import attr_dict, chunk_sequence
 
 
 def numpy_episodes(

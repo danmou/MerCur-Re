@@ -17,12 +17,13 @@ import wandb
 from loguru import logger
 
 import project.models.planet
-import project.models.planet.control.wrappers
+from project.environments import wrappers
 from project.environments.habitat import VectorHabitat
 from project.models.planet.scripts.configs import default as planet_config
 from project.models.planet.training.define_model import build_network
-from project.models.planet_interface import AttrDict, PlanetParams, create_tf_session
-from project.util import PrettyPrinter, Statistics
+from project.util import AttrDict, PrettyPrinter, Statistics
+from project.util.planet_interface import PlanetParams
+from project.util.tf import create_tf_session
 from project.util.timing import Timer, measure_time
 
 
@@ -39,11 +40,11 @@ def evaluate(logdir: Path,
         np.random.seed(seed)
         tf.compat.v1.set_random_seed(seed)
     params = PlanetParams()
-    with params.unlocked:
+    with params.unlocked():
         params.logdir = str(logdir)
         params.batch_shape = [1, 1]
     config = AttrDict()
-    with config.unlocked:
+    with config.unlocked():
         config = planet_config(config, params)
     collect_params = next(iter(config.collects.values()))  # We assume all collects have same task and planner
     if existing_env is None:
@@ -58,7 +59,7 @@ def evaluate(logdir: Path,
     graph = create_graph(data, config)
     agent = create_agent(graph, env, collect_params, config, deterministic=seed is not None)
     steps_op, score_op, metrics_op = define_episode(env, agent)
-    logger.debug(f'Graph contains {project.models.planet.tools.count_weights()} trainable variables')
+    logger.debug(f'Graph contains {project.util.planet.count_weights()} trainable variables')
     sess = create_tf_session()
     with sess:
         restore_checkpoint(sess, checkpoint, logdir, config.savers[0])
@@ -135,10 +136,10 @@ def reconfigure_env(env: VectorHabitat,
 @measure_time()
 def wrap_env(env: VectorHabitat, task: AttrDict) -> project.models.planet.control.InGraphBatchEnv:
     env.call_at(0, 'enable_curriculum', {'enable': False})
-    wrapped_env: gym.Env = project.models.planet.control.wrappers.SelectObservations(env, task.observation_components)
-    wrapped_env = project.models.planet.control.wrappers.SelectMetrics(wrapped_env, task.metrics)
+    wrapped_env: gym.Env = wrappers.SelectObservations(env, task.observation_components)
+    wrapped_env = wrappers.SelectMetrics(wrapped_env, task.metrics)
     with tf.compat.v1.variable_scope('environment', use_resource=True):
-        batch_env = project.models.planet.control.InGraphBatchEnv(project.models.planet.control.BatchEnv([wrapped_env], blocking=True))
+        batch_env = project.models.planet.control.InGraphBatchEnv(project.models.planet.control.BatchEnv([wrapped_env]))
     return batch_env
 
 
@@ -165,7 +166,7 @@ def create_graph(data: Dict[str, tf.Tensor],
         graph = AttrDict(_unlocked=True, step=tf.constant(0, dtype=tf.int32, name='step'))
         graph.update(build_network(data, config))
         graph.embedded = graph.encoder(data)
-        graph.prior, graph.posterior = project.models.planet.tools.unroll.closed_loop(
+        graph.prior, graph.posterior = project.util.planet.unroll.closed_loop(
             graph.cell, graph.embedded, data['action'], config.debug)
     return graph
 
@@ -229,8 +230,8 @@ def define_episode(env: project.models.planet.control.InGraphBatchEnv,
 
 def restore_checkpoint(sess: tf.compat.v1.Session, checkpoint: Path, logdir: Path, params: Dict[str, str]) -> None:
     to_initialize = set(sess.graph.get_collection(tf.compat.v1.GraphKeys.LOCAL_VARIABLES) +
-                        project.models.planet.tools.filter_variables(include=params.get('exclude')))
-    to_restore = set(project.models.planet.tools.filter_variables(**params))
+                        project.util.planet.filter_variables(include=params.get('exclude')))
+    to_restore = set(project.util.planet.filter_variables(**params))
     both = to_initialize.intersection(to_restore)
     assert not both, f'These variables are being initialized and restored: {both}'
     all_vars = set(sess.graph.get_collection(tf.compat.v1.GraphKeys.LOCAL_VARIABLES) +

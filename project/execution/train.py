@@ -10,7 +10,8 @@ import tensorflow as tf
 from loguru import logger
 
 from project.models.planet.scripts.train import process as planet_train
-from project.models.planet_interface import AttrDict, PlanetParams
+from project.util import AttrDict
+from project.util.planet_interface import PlanetParams
 
 from .evaluate import evaluate
 
@@ -19,7 +20,7 @@ from .evaluate import evaluate
 def train(logdir: str, initial_data: Optional[str], num_eval_episodes: int = 10) -> None:
     params = PlanetParams()
     if initial_data:
-        with params.unlocked:
+        with params.unlocked():
             params.num_seed_episodes = 0
         logger.info('Linking initial dataset.')
         for dataset in ['test_episodes', 'train_episodes']:
@@ -30,7 +31,7 @@ def train(logdir: str, initial_data: Optional[str], num_eval_episodes: int = 10)
                 dest_file.symlink_to(src_file)
 
     args = AttrDict()
-    with args.unlocked:
+    with args.unlocked():
         args.config = 'default'
         args.params = params
 

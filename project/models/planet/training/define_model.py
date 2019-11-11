@@ -14,8 +14,8 @@
 
 import tensorflow as tf
 
-from project.models.planet import tools
 from project.models.planet.training import define_summaries, utility
+from project.util import planet as tools
 
 
 def define_model(data, trainer, config, envs):

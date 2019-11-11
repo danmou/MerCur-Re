@@ -17,9 +17,12 @@ import functools
 import os
 
 import tensorflow as tf
+from loguru import logger
 
-from project.models.planet import control, tools
+from project.environments import wrappers
+from project.models.planet import control
 from project.models.planet.training import trainer as trainer_
+from project.util import planet as tools
 
 Objective = collections.namedtuple(
     'Objective', 'name, value, goal, include, exclude')
@@ -39,7 +42,7 @@ def get_batch(datasets, phase, reset):
     Returns:
       data: a batch of data from either the train or test set.
     """
-    with datasets.unlocked:
+    with datasets.unlocked():
         datasets.train = datasets.train.make_one_shot_iterator()
         datasets.test = datasets.test.make_one_shot_iterator()
     data = tf.cond(
@@ -80,7 +83,7 @@ def train(model_fn, datasets, logdir, config, envs):
         raise KeyError('You must specify a configuration.')
     logdir = logdir and os.path.expanduser(logdir)
     if logdir:
-        with config.unlocked:
+        with config.unlocked():
             config.logdir = logdir
     trainer = trainer_.Trainer(logdir, config=config)
     cleanups = []
@@ -210,9 +213,9 @@ def simulate_episodes(
         config, params, graph, cleanups, env,
         expensive_summaries, gif_summary, metrics_summaries, name):
     if params.save_episode_dir:
-        env = control.wrappers.CollectGymDataset(env, params.save_episode_dir)
-    env = control.wrappers.SelectObservations(env, params.task.observation_components)
-    env = control.wrappers.SelectMetrics(env, params.task.metrics)
+        env = wrappers.CollectGymDataset(env, params.save_episode_dir)
+    env = wrappers.SelectObservations(env, params.task.observation_components)
+    env = wrappers.SelectMetrics(env, params.task.metrics)
     cell = graph.cell
     agent_config = tools.AttrDict(
         cell=cell,
@@ -223,9 +226,9 @@ def simulate_episodes(
         preprocess_fn=config.preprocess_fn,
         postprocess_fn=config.postprocess_fn)
     params = params.copy()
-    with params.unlocked:
+    with params.unlocked():
         params.update(agent_config)
-    with agent_config.unlocked:
+    with agent_config.unlocked():
         agent_config.update(params)
     summary, return_, metrics = control.simulate(
         graph.step, env, params.task.max_length, agent_config,
@@ -275,5 +278,5 @@ def collect_initial_episodes(config, envs):
             remaining = params.num_episodes - existing[outdir]
             existing[outdir] = 0
             env = envs[params.task.name]
-            print('Collecting {} initial episodes ({}).'.format(remaining, name))
+            logger.info('Collecting {} initial episodes ({}).'.format(remaining, name))
             control.random_episodes(env, remaining, outdir)

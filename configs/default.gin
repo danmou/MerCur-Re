@@ -50,19 +50,19 @@ planet.planner_amount = 1000  # number of action sequence samples per iteration
 planet.planner_topk = 100  # number of best samples to use as basis for next iteration
 
 # TF options
-planet.tf.options.log_device_placement = False
-# planet.tf.options.device_count = {'GPU': 0, 'CPU': 4}
-planet.tf.debugger = False
+tf.options.log_device_placement = False
+# tf.options.device_count = {'GPU': 0, 'CPU': 4}
+tf.debugger = False
 
 # GPU options
-planet.tf.gpu_options.allow_growth = True
-planet.tf.gpu_options.visible_device_list = '1'
-# planet.tf.gpu_options.per_process_gpu_memory_fraction = 0.5
+tf.gpu_options.allow_growth = True
+tf.gpu_options.visible_device_list = '1'
+# tf.gpu_options.per_process_gpu_memory_fraction = 0.5
 
 ### Habitat ###
 # Basic
-planet_habitat_task.wrappers = [@curriculum(),
-                                @action_repeat()]
+habitat_task.wrappers = [@curriculum(),
+                         @action_repeat()]
 curriculum.enabled = True
 curriculum.start_threshold = 1.5  # Initial threshold in meters.
 curriculum.initial_delay = 200  # Number of episodes to wait before increasing threshold.

@@ -19,8 +19,9 @@ import sys
 import matplotlib
 import tensorflow as tf
 
-from project.models.planet import tools, training
+from project.models.planet import training
 from project.models.planet.scripts import configs
+from project.util import planet as tools
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))))
@@ -30,10 +31,10 @@ matplotlib.use('Agg')
 
 
 def process(logdir, args):
-    with args.params.unlocked:
+    with args.params.unlocked():
         args.params.logdir = logdir
     config = tools.AttrDict()
-    with config.unlocked:
+    with config.unlocked():
         config = getattr(configs, args.config)(config, args.params)
     envs = {name: task.env_ctor() for name, task in config.tasks.items()}
     training.utility.collect_initial_episodes(config, envs)

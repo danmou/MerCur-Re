@@ -6,4 +6,4 @@ from pathlib import Path
 
 
 def get_config_dir() -> str:
-    return str(Path(__file__).parent.parent / 'configs')
+    return str(Path(__file__).parent.parent.parent / 'configs')

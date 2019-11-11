@@ -14,7 +14,7 @@
 
 import tensorflow as tf
 
-from project.models.planet.tools import filter_variables_lib
+from project.util.planet import filter_variables_lib
 
 
 class CustomOptimizer(object):

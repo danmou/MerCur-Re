@@ -17,7 +17,8 @@ import os
 
 import tensorflow as tf
 
-from project.models.planet import tools
+from project.util import planet as tools
+from project.util.tf import create_tf_session
 
 _Phase = collections.namedtuple(
     'Phase',
@@ -175,7 +176,7 @@ class Trainer(object):
         Yields:
           Reported mean scores.
         """
-        sess = sess or self._create_session()
+        sess = sess or create_tf_session()
         with sess:
             self._initialize_variables(sess, self._loaders, self._checkpoints)
             sess.graph.finalize()
@@ -265,19 +266,6 @@ class Trainer(object):
                     tf.identity(summary),
                     tf.identity(score),
                     tf.identity(self._next_step))
-
-    def _create_session(self):
-        """Create a TensorFlow session with sensible default parameters.
-
-        Returns:
-          Session.
-        """
-        config = tf.compat.v1.ConfigProto()
-        config.gpu_options.allow_growth = True
-        try:
-            return tf.compat.v1.Session('local', config=config)
-        except tf.errors.NotFoundError:
-            return tf.compat.v1.Session(config=config)
 
     def _initialize_variables(self, sess, savers, checkpoints):
         """Initialize or restore variables from a checkpoint if available.

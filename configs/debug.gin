@@ -26,9 +26,9 @@ planet.planner_topk = 2
 planet.planner_iterations = 2
 planet.checkpoint_to_load = None  # can be a dir or a specific file, absolute or relative to the logdir
 
-# planet.tf.options.log_device_placement = True
-planet.tf.gpu_options.visible_device_list = '0'
-# planet.tf.debugger = True
+# tf.options.log_device_placement = True
+tf.gpu_options.visible_device_list = '0'
+# tf.debugger = True
 
 Habitat.dataset = 'habitat_test'
 Habitat.gpu_id = 0

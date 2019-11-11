@@ -1,4 +1,4 @@
-# wrappers.py: Additional wrappers to supplement project.models.planet.control.wrappers.
+# wrappers.py: Additional wrappers to supplement planet_wrappers.
 # Note: Classes with @gin.configurable decorator are unpicklable and hence can't be used with Habitat's VectorEnv, so
 # instead each class has an associated function that adds the gin-config arguments to a kwargs dict.
 #
@@ -11,19 +11,7 @@ import gym.spaces
 import numpy as np
 from loguru import logger
 
-import project.models.planet.control.wrappers as planet_wrappers
-
-Observations = Dict[str, np.ndarray]
-ObsTuple = Tuple[Observations, float, bool, Dict[str, Any]]  # obs, reward, done, info
-
-
-class Wrapper(planet_wrappers.Wrapper):
-    """Simply a type-annotated version of planet_wrappers.Wrapper"""
-    def step(self, action: int) -> ObsTuple:
-        return cast(ObsTuple, super().step(action))
-
-    def reset(self, **kwargs: Any) -> Observations:
-        return cast(Observations, super().reset(**kwargs))
+from .base import Action, Observations, ObsTuple, Wrapper
 
 
 class DiscreteWrapper(Wrapper):
@@ -39,7 +27,8 @@ class DiscreteWrapper(Wrapper):
                                            shape=(self.env.action_space.n,),
                                            dtype=np.float32)
 
-    def step(self, action: np.ndarray) -> ObsTuple:
+    def step(self, action: Action) -> ObsTuple:
+        assert isinstance(action, np.ndarray)
         if self._sample:
             action = action + 1  # shift to make values positive
             if np.sum(action) < 0.01:
@@ -48,7 +37,7 @@ class DiscreteWrapper(Wrapper):
             act = np.random.choice(len(action), p=action/np.sum(action))
         else:
             act = np.argmax(action)
-        return cast(ObsTuple, self.env.step(act))
+        return super().step(act)
 
 
 @gin.configurable(whitelist=['sample'])
@@ -56,18 +45,19 @@ def discrete_wrapper(sample: bool = False) -> Tuple[Type[DiscreteWrapper], Calla
     return DiscreteWrapper, lambda kwargs: {'sample': sample}
 
 
-class MinimumDuration(Wrapper):
+class HabitatMinimumDuration(Wrapper):
     """Extends the episode to a given lower number of decision points by preventing stop actions."""
     def __init__(self, env: gym.Env, duration: int) -> None:
         super().__init__(env)
         self._duration = duration
         self._step = 0
 
-    def step(self, action: np.ndarray) -> ObsTuple:
+    def step(self, action: Action) -> ObsTuple:
+        assert isinstance(action, np.ndarray)
         self._step += 1
         if self._step < self._duration:
             action[self.env.stop_action] = self.action_space.low[self.env.stop_action]  # set stop probability to zero
-        obs, reward, done, info = cast(ObsTuple, self.env.step(action))
+        obs, reward, done, info = super().step(action)
         if done:
             if self._step < self._duration:
                 logger.warning(f'Episode finished at step {self._step}, but requirement is {self._duration}.')
@@ -75,14 +65,14 @@ class MinimumDuration(Wrapper):
                 logger.debug(f'Episode finished at step {self._step}.')
         return obs, reward, done, info
 
-    def reset(self, **kwargs: Any) -> Observations:
+    def reset(self) -> Observations:
         self._step = 0
-        return cast(Observations, self.env.reset(**kwargs))
+        return super().reset()
 
 
 @gin.configurable(whitelist=[])
-def minimum_duration() -> Tuple[Type[MinimumDuration], Callable[[Dict[str, Any]], Dict[str, Any]]]:
-    return MinimumDuration, lambda kwargs: {'duration': kwargs['min_duration']}
+def habitat_minimum_duration() -> Tuple[Type[HabitatMinimumDuration], Callable[[Dict[str, Any]], Dict[str, Any]]]:
+    return HabitatMinimumDuration, lambda kwargs: {'duration': kwargs['min_duration']}
 
 
 class AutomaticStop(Wrapper):
@@ -95,7 +85,8 @@ class AutomaticStop(Wrapper):
         if self._enable:
             self.action_space = gym.spaces.Discrete(self.env.action_space.n - 1)
 
-    def step(self, action: int) -> ObsTuple:
+    def step(self, action: Action) -> ObsTuple:
+        assert isinstance(action, int)
         self._step += 1
         if self._enable:
             if self._step >= self._duration and self.env.distance_to_target() < self.env.success_distance:
@@ -104,9 +95,9 @@ class AutomaticStop(Wrapper):
                 action += 1
         return super().step(action)
 
-    def reset(self, **kwargs: Any) -> Observations:
+    def reset(self) -> Observations:
         self._step = 0
-        return cast(Observations, self.env.reset(**kwargs))
+        return super().reset()
 
 
 @gin.configurable(whitelist=['enable'])
@@ -148,8 +139,8 @@ class Curriculum(Wrapper):
     def enable_curriculum(self, enable: bool = True) -> None:
         self._enabled = enable
 
-    def reset(self, **kwargs: Any) -> Observations:
-        obs = self.env.reset(**kwargs)
+    def reset(self) -> Observations:
+        obs = super().reset()
         if self._enabled:
             count = 0
             while self.episode_length > self.threshold:
@@ -163,9 +154,9 @@ class Curriculum(Wrapper):
                     count = 0
                 else:
                     count += 1
-                obs = self.env.reset(**kwargs)
+                obs = self.env.reset()
             self._episodes += 1
-        return cast(Observations, obs)
+        return obs
 
 
 @gin.configurable(whitelist=['enabled', 'start_threshold', 'initial_delay', 'increase_rate'])
@@ -178,8 +169,3 @@ def curriculum(enabled: bool = True,
                                        'start_threshold': start_threshold,
                                        'initial_delay': initial_delay,
                                        'increase_rate': increase_rate}
-
-
-@gin.configurable(whitelist=[])
-def action_repeat() -> Tuple[Type[planet_wrappers.ActionRepeat], Callable[[Dict[str, Any]], Dict[str, Any]]]:
-    return planet_wrappers.ActionRepeat, lambda kwargs: {'amount': kwargs['action_repeat']}

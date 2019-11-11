@@ -16,9 +16,11 @@ import os
 
 import tensorflow as tf
 
-from project.models.planet import control, models, networks, tools
+import project.tasks as tasks_lib
+from project.environments import wrappers
+from project.models.planet import control, models, networks
 from project.models.planet.scripts import objectives as objectives_lib
-from project.models.planet.scripts import tasks as tasks_lib
+from project.util import planet as tools
 
 ACTIVATIONS = {
     'relu': tf.nn.relu,
@@ -62,7 +64,7 @@ def debug(config, params):
     defaults.planner_amount = 5
     defaults.planner_topk = 2
     defaults.planner_iterations = 2
-    with params.unlocked:
+    with params.unlocked():
         for key, value in defaults.items():
             if key not in params:
                 params[key] = value
@@ -132,9 +134,9 @@ def _tasks(config, params):
 
     def common_spaces_ctor(task, action_spaces):
         env = task.env_ctor()
-        env = control.wrappers.SelectObservations(env, task.observation_components)
-        env = control.wrappers.SelectMetrics(env, task.metrics)
-        env = control.wrappers.PadActions(env, action_spaces)
+        env = wrappers.SelectObservations(env, task.observation_components)
+        env = wrappers.SelectMetrics(env, task.metrics)
+        env = wrappers.PadActions(env, action_spaces)
         return env
 
     if len(tasks) > 1:
@@ -203,7 +205,7 @@ def _training_schedule(config, params):
     config.test_dir = os.path.join(params.logdir, 'test_episodes')
     config.random_collects = _initial_collection(config, params)
     config.collects = tools.AttrDict()
-    with config.collects.unlocked:
+    with config.collects.unlocked():
         config.collects.update(_active_collection(
             params.get('train_collects', [{}]), dict(
                 every=params.get('train_collect_every', 100),

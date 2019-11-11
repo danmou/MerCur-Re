@@ -14,7 +14,7 @@
 
 import tensorflow as tf
 
-from project.models.planet import tools
+from project.util import planet as tools
 
 
 def cross_entropy_method(

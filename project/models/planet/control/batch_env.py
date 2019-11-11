@@ -18,7 +18,7 @@ import numpy as np
 class BatchEnv(object):
     """Combine multiple environments to step them in batch."""
 
-    def __init__(self, envs, blocking):
+    def __init__(self, envs):
         """Combine multiple environments to step them in batch.
 
         To step environments in parallel, environments must support a
@@ -27,13 +27,11 @@ class BatchEnv(object):
 
         Args:
           envs: List of environments.
-          blocking: Step environments after another rather than in parallel.
 
         Raises:
           ValueError: Environments have different observation or action spaces.
         """
         self._envs = envs
-        self._blocking = blocking
         observ_space = self._envs[0].observation_space
         if not all(env.observation_space == observ_space for env in self._envs):
             raise ValueError('All environments must use the same observation space.')
@@ -76,15 +74,9 @@ class BatchEnv(object):
             if not env.action_space.contains(action):
                 message = 'Invalid action at index {}: {}'
                 raise ValueError(message.format(index, action))
-        if self._blocking:
-            transitions = [
-                env.step(action)
-                for env, action in zip(self._envs, actions)]
-        else:
-            transitions = [
-                env.step(action, blocking=False)
-                for env, action in zip(self._envs, actions)]
-            transitions = [transition() for transition in transitions]
+        transitions = [
+            env.step(action)
+            for env, action in zip(self._envs, actions)]
         observs, rewards, dones, infos = zip(*transitions)
         observ = self._stack_observations(observs)
         reward = np.stack(rewards).astype(np.float32)
@@ -103,11 +95,7 @@ class BatchEnv(object):
         """
         if indices is None:
             indices = np.arange(len(self._envs))
-        if self._blocking:
-            observs = [self._envs[index].reset() for index in indices]
-        else:
-            observs = [self._envs[index].reset(blocking=False) for index in indices]
-            observs = [observ() for observ in observs]
+        observs = [self._envs[index].reset() for index in indices]
         observ = self._stack_observations(observs)
         return observ
 

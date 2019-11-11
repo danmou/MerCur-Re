@@ -15,7 +15,7 @@
 """Chunk sequences into fixed lengths."""
 import tensorflow as tf
 
-from project.models.planet.tools import nested
+from project.util.planet import nested
 
 
 def chunk_sequence(sequence, chunk_length, randomize=True, num_chunks=None):

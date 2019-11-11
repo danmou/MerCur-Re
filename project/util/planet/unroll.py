@@ -14,7 +14,7 @@
 
 import tensorflow as tf
 
-from project.models.planet.tools import nested, shape
+from project.util.planet import nested, shape
 
 
 def closed_loop(cell, embedded, prev_action, debug=False):

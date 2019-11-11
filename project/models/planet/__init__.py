@@ -12,6 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import control, models, networks, scripts, tools, training
+from . import control, models, networks, scripts, training
 
-__all__ = ['control', 'models', 'networks', 'scripts', 'tools', 'training']
+__all__ = ['control', 'models', 'networks', 'scripts', 'training']

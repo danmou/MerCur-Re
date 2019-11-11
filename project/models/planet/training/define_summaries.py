@@ -15,8 +15,8 @@
 import tensorflow as tf
 from tensorflow_probability import distributions as tfd
 
-from project.models.planet import tools
-from project.models.planet.tools import summary
+from project.util import planet as tools
+from project.util.planet import summary
 
 
 def define_summaries(graph, config, cleanups):
