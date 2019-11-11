@@ -12,20 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import collections
 import functools
 import os
 
 import tensorflow as tf
 
-from project.models.planet import control
-from project.models.planet import tools
+from project.models.planet import control, tools
 from project.models.planet.training import trainer as trainer_
-
 
 Objective = collections.namedtuple(
     'Objective', 'name, value, goal, include, exclude')
@@ -219,13 +213,12 @@ def simulate_episodes(
         env = control.wrappers.CollectGymDataset(env, params.save_episode_dir)
     env = control.wrappers.SelectObservations(env, params.task.observation_components)
     env = control.wrappers.SelectMetrics(env, params.task.metrics)
-    bind_or_none = lambda x, **kw: x and functools.partial(x, **kw)
     cell = graph.cell
     agent_config = tools.AttrDict(
         cell=cell,
         encoder=graph.encoder,
         planner=functools.partial(params.planner, graph=graph),
-        objective=bind_or_none(params.objective, graph=graph),
+        objective=params.objective and functools.partial(params.objective, graph=graph),
         exploration=params.exploration,
         preprocess_fn=config.preprocess_fn,
         postprocess_fn=config.postprocess_fn)

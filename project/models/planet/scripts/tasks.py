@@ -12,17 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import collections
 
 import numpy as np
 
-from project.models.planet import control
-from project.models.planet import tools
-
+from project.models.planet import control, tools
 
 Task = collections.namedtuple(
     'Task', 'name, env_ctor, max_length, state_components, observation_components, metrics')

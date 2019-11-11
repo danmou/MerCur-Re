@@ -3,7 +3,7 @@
 # (C) 2019, Daniel Mouritzen
 
 from math import inf
-from typing import Dict, Iterable, Optional, Tuple, Type
+from typing import Dict, Iterable, Optional, Tuple
 
 import gin
 import gym
@@ -28,7 +28,7 @@ class RewardFunction:
     def reset(self) -> None:
         pass
 
-    def assert_env(self):
+    def assert_env(self) -> None:
         assert self._env is not None, 'set_env has not been called yet!'
 
 
@@ -67,33 +67,33 @@ class DenseReward(RewardFunction):
     Implements a dense reward function based on
     github.com/facebookresearch/habitat-api/blob/master/habitat_baselines/common/environments.py
     """
-    def __init__(self, slack_reward, success_reward, distance_scaling) -> None:
+    def __init__(self, slack_reward: float, success_reward: float, distance_scaling: float) -> None:
         # assert all(hasattr(env, name) for name in ('distance_to_target', 'episode_success', 'habitat_env')), \
         #        'Env must be a Habitat environment!'
         super().__init__()
         self._slack_reward = slack_reward
         self._success_reward = success_reward
         self._distance_scaling = distance_scaling
-        self._previous_target_distance = None
+        self._previous_target_distance: Optional[float] = None
 
     def get_reward_range(self) -> Tuple[float, float]:
         self.assert_env()
-        step_size = self._env.sim.config.FORWARD_STEP_SIZE
+        step_size: float = self._env.sim.config.FORWARD_STEP_SIZE  # type: ignore[union-attr]
         return self._slack_reward - step_size, self._success_reward + step_size
 
     def get_reward(self, observations: Observations) -> float:
         self.assert_env()
         if self._previous_target_distance is None:
             # New episode
-            self._previous_target_distance = self._env.habitat_env.current_episode.info["geodesic_distance"]
+            self._previous_target_distance = self._env.habitat_env.current_episode.info["geodesic_distance"]  # type: ignore[union-attr]
 
         reward = self._slack_reward
 
-        current_target_distance = self._env.distance_to_target()
+        current_target_distance: float = self._env.distance_to_target()  # type: ignore[union-attr]
         reward += self._distance_scaling * (self._previous_target_distance - current_target_distance)
         self._previous_target_distance = current_target_distance
 
-        if self._env.episode_success():
+        if self._env.episode_success():  # type: ignore[union-attr]
             reward += self._success_reward
 
         return reward
@@ -122,8 +122,8 @@ class OptimalPathLengthReward(RewardFunction):
 
     def get_reward(self, observations: Observations) -> float:
         self.assert_env()
-        if self._env.episode_success():
-            optimal_path_length: float = self._env.habitat_env.current_episode.info["geodesic_distance"]
+        if self._env.episode_success():  # type: ignore[union-attr]
+            optimal_path_length: float = self._env.habitat_env.current_episode.info["geodesic_distance"]  # type: ignore[union-attr]
             return self._scaling * optimal_path_length
         return 0.0
 
@@ -145,7 +145,7 @@ class CollisionPenalty(RewardFunction):
 
     def get_reward(self, observations: Observations) -> float:
         self.assert_env()
-        if self._env.sim.previous_step_collided:
+        if self._env.sim.previous_step_collided:  # type: ignore[union-attr]
             return -self._scaling
         return 0.0
 
@@ -171,8 +171,8 @@ class ObstacleDistancePenalty(RewardFunction):
 
     def get_reward(self, observations: Observations) -> float:
         self.assert_env()
-        distance: float = self._env.sim.distance_to_closest_obstacle(
-            self._env.sim.get_agent_state().position, self._threshold) - self._env.sim.config.AGENT_0.RADIUS
+        distance: float = self._env.sim.distance_to_closest_obstacle(  # type: ignore[union-attr]
+            self._env.sim.get_agent_state().position, self._threshold) - self._env.sim.config.AGENT_0.RADIUS  # type: ignore[union-attr]
         if distance < self._threshold:
             return self._scaling * (distance / self._threshold - 1.0)
         return 0.0

@@ -12,10 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import tensorflow as tf
 from tensorflow_probability import distributions as tfd
 
@@ -24,7 +20,8 @@ from project.models.planet.models import base
 
 
 class RSSM(base.Base):
-    """Deterministic and stochastic state model.
+    r"""
+    Deterministic and stochastic state model.
 
     The stochastic latent is computed from the hidden state at the same time
     step. If an observation is present, the posterior latent is compute from both

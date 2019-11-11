@@ -12,21 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import os
 
 import tensorflow as tf
 
-from project.models.planet import control
-from project.models.planet import models
-from project.models.planet import networks
-from project.models.planet import tools
+from project.models.planet import control, models, networks, tools
 from project.models.planet.scripts import objectives as objectives_lib
 from project.models.planet.scripts import tasks as tasks_lib
-
 
 ACTIVATIONS = {
     'relu': tf.nn.relu,

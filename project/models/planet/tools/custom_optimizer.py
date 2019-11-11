@@ -12,10 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import tensorflow as tf
 
 from project.models.planet.tools import filter_variables_lib
@@ -51,8 +47,10 @@ class CustomOptimizer(object):
         if self._debug:
             # print_op = tf.print('{}_grad_norm='.format(self._name), grad_norm)
             message = 'Zero gradient norm in {} optimizer.'.format(self._name)
-            assertion = lambda: tf.compat.v1.assert_greater(grad_norm, 0.0, message=message)
-            assert_op = tf.cond(condition, assertion, tf.no_op)
+            assert_op = tf.cond(
+                condition,
+                lambda: tf.compat.v1.assert_greater(grad_norm, 0.0, message=message),
+                tf.no_op)
             with tf.control_dependencies([assert_op]):
                 summary = tf.identity(summary)
         return summary, grad_norm

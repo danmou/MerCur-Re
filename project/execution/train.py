@@ -1,16 +1,17 @@
-# train.py: 
+# train.py: Train model
 #
 # (C) 2019, Daniel Mouritzen
 
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import gin
 import tensorflow as tf
 from loguru import logger
 
 from project.models.planet.scripts.train import process as planet_train
-from project.models.planet_interface import PlanetParams, AttrDict
+from project.models.planet_interface import AttrDict, PlanetParams
+
 from .evaluate import evaluate
 
 
@@ -33,7 +34,7 @@ def train(logdir: str, initial_data: Optional[str], num_eval_episodes: int = 10)
         args.config = 'default'
         args.params = params
 
-    def eval_(envs):
+    def eval_(envs: Dict[str, Any]) -> None:
         with tf.Graph().as_default():
             evaluate(logdir=Path(logdir),
                      checkpoint=Path(logdir),

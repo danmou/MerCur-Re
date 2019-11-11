@@ -48,14 +48,14 @@ def with_global_options(func: Callable[..., None]) -> Callable[..., None]:
             if verbose:
                 print(f'Using config {config}.')  # use print because logging has not yet been initialized
         if gpus is None and 'CUDA_VISIBLE_DEVICES' not in os.environ:
-            print(f'Warning: No GPU devices specified. Defaulting to device 0.')
+            print('Warning: No GPU devices specified. Defaulting to device 0.')
             os.environ['CUDA_VISIBLE_DEVICES'] = '0'
         if gpus is not None:
             os.environ['CUDA_VISIBLE_DEVICES'] = gpus
         return func(config, data, verbosity, debug, extra_options, **kwargs)
     wrapper.__doc__ = textwrap.dedent(func.__doc__ or '') + "\n\nEXTRA_OPTIONS is one or more additional " \
                                                             "gin-config options, e.g. 'planet.max_epochs=200'"
-    wrapper.__click_params__ += getattr(func, '__click_params__', [])  # type: ignore
+    wrapper.__click_params__ += getattr(func, '__click_params__', [])  # type: ignore[attr-defined]
     return wrapper
 
 
@@ -106,7 +106,7 @@ def evaluate_command(config: str,
     # assert model or wandb_run, 'Either --model or --wandb-run must be specified!'
     if not wandb_run:
         os.environ[wandb.env.MODE] = 'dryrun'
-    model = model and Path(model)
+    model_path = None if model is None else Path(model)
     with main_configure(config,
                         extra_options,
                         verbosity,
@@ -114,4 +114,4 @@ def evaluate_command(config: str,
                         data=data,
                         job_type='eval',
                         wandb_continue=wandb_run) as main:
-        main.evaluate(model, num_episodes, not no_video, seed, no_sync)
+        main.evaluate(model_path, num_episodes, not no_video, seed, no_sync)

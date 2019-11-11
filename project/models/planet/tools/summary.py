@@ -12,23 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import matplotlib
-
-
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 from matplotlib.ticker import AutoMinorLocator, MultipleLocator
 
-from project.models.planet.tools import count_dataset
-from project.models.planet.tools import gif_summary
-from project.models.planet.tools import image_strip_summary
+from project.models.planet.tools import count_dataset, gif_summary, image_strip_summary
 from project.models.planet.tools import shape as shapelib
+
+matplotlib.use('Agg')
 
 
 def plot_summary(titles, lines, labels, name, grid=True):
@@ -110,7 +103,9 @@ def state_summaries(
     posterior = cell.dist_from_state(posterior, mask)
     prior_entropy = prior.entropy()
     posterior_entropy = posterior.entropy()
-    nan_to_num = lambda x: tf.where(tf.is_nan(x), tf.zeros_like(x), x)
+
+    def nan_to_num(x):
+        return tf.where(tf.is_nan(x), tf.zeros_like(x), x)
     with tf.compat.v1.variable_scope(name):
         if histograms:
             summaries.append(tf.compat.v1.summary.histogram(

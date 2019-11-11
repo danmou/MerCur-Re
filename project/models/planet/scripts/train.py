@@ -12,28 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import os
 import sys
 
+# Need offline backend to render summaries from within tf.py_func.
+import matplotlib
+import tensorflow as tf
+
+from project.models.planet import tools, training
+from project.models.planet.scripts import configs
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))))
 
-# Need offline backend to render summaries from within tf.py_func.
-import matplotlib
-
 
 matplotlib.use('Agg')
-
-import tensorflow as tf
-
-from project.models.planet import tools
-from project.models.planet import training
-from project.models.planet.scripts import configs
 
 
 def process(logdir, args):

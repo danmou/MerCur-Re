@@ -10,7 +10,7 @@ import time
 from contextlib import contextmanager
 from ctypes.util import find_library
 from pathlib import Path
-from typing import Any, Callable, Dict, Generator, Optional, Sequence, TypeVar, Union, cast
+from typing import Any, Callable, Dict, Generator, Optional, Sequence, Union, cast
 
 import numpy as np
 from loguru import logger
@@ -61,18 +61,15 @@ class Timer:
         self.interval = self.end - self.start
 
 
-T = TypeVar('T')
-
-
-def measure_time(log_fn: Callable[[str], None] = logger.debug, name: Optional[str] = None) -> Callable[[T], T]:
-    def wrapper(fn: T) -> T:
+def measure_time(log_fn: Callable[[str], None] = logger.debug, name: Optional[str] = None) -> Callable[[Callable], Callable]:
+    def wrapper(fn: Callable) -> Callable:
         def timed(*args: Any, **kwargs: Any) -> Any:
             with Timer() as t:
                 result = fn(*args, **kwargs)
             fn_name = name or fn.__name__
             log_fn(f'Call to {fn_name} finished in {t.interval:.3g}s')
             return result
-        return cast(T, timed)
+        return cast(Callable, timed)
     return wrapper
 
 

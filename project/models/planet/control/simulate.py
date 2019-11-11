@@ -14,16 +14,10 @@
 
 """In-graph simulation step of a vectorized algorithm with environments."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import tensorflow as tf
 
 from project.models.planet import tools
-from project.models.planet.control import batch_env
-from project.models.planet.control import in_graph_batch_env
-from project.models.planet.control import mpc_agent
+from project.models.planet.control import batch_env, in_graph_batch_env, mpc_agent
 from project.models.planet.tools import streaming_mean
 
 

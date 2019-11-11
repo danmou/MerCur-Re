@@ -12,7 +12,7 @@ import tensorflow as tf
 from loguru import logger
 from tensorflow.python import debug as tf_debug
 
-import project.models.planet.control.wrappers as planet_wrappers
+import project.models.planet.control.wrappers
 import project.models.planet.tools
 import project.models.planet.training
 from project.environments import habitat, wrappers
@@ -30,8 +30,8 @@ class PlanetParams(AttrDict):
             self.tasks = ['habitat']
 
 
-def habitat_env_ctor(*params: Tuple[str, Any]) -> gym.Env:
-    params = dict(params)
+def habitat_env_ctor(*params_tuple: Tuple[str, Any]) -> gym.Env:
+    params = dict(params_tuple)
     wrappers = params.pop('wrappers')
     min_duration = params['min_duration']
     max_duration = params['max_duration']
@@ -54,13 +54,13 @@ def planet_habitat_task(config: AttrDict,
     state_components = ['reward']
     observation_components = ['image', 'goal']
     metrics = ['success', 'spl', 'path_length', 'optimal_path_length', 'remaining_distance', 'collisions']
-    params = {'action_repeat': action_repeat,
-              'min_duration': config.batch_shape[1],
-              'max_duration': max_length,
-              'capture_video': False}
-    params['wrappers'] = [(Wrapper, kwarg_fn(params)) for Wrapper, kwarg_fn in wrappers]
-    params.update(habitat.get_config(max_steps=max_length*action_repeat*3))  # times 3 because TURN_ANGLE is really 3 actions
-    env_ctor = project.models.planet.tools.bind(habitat.VectorHabitat, habitat_env_ctor, params)
+    env_params = {'action_repeat': action_repeat,
+                  'min_duration': config.batch_shape[1],
+                  'max_duration': max_length,
+                  'capture_video': False}
+    env_params['wrappers'] = [(Wrapper, kwarg_fn(env_params)) for Wrapper, kwarg_fn in wrappers]
+    env_params.update(habitat.get_config(max_steps=max_length*action_repeat*3))  # times 3 because TURN_ANGLE is really 3 actions
+    env_ctor = project.models.planet.tools.bind(habitat.VectorHabitat, habitat_env_ctor, env_params)
     return PlanetTask('habitat', env_ctor, max_length, state_components, observation_components, metrics)
 
 
@@ -135,8 +135,8 @@ def tf_print(*args: Any) -> tf.Tensor:
 
 
 # Monkey patch PlaNet to add `habitat` task and use loguru instead of print for logging
-tasks_lib.habitat = planet_habitat_task  # type: ignore
-project.models.planet.control.wrappers.print = logger.info  # type: ignore
-project.models.planet.training.utility.print = logger.info  # type: ignore
-project.models.planet.training.trainer.Trainer = PlanetTrainer  # type: ignore
+tasks_lib.habitat = planet_habitat_task  # type: ignore[attr-defined]
+project.models.planet.control.wrappers.print = logger.info  # type: ignore[attr-defined]
+project.models.planet.training.utility.print = logger.info  # type: ignore[attr-defined]
+project.models.planet.training.trainer.Trainer = PlanetTrainer  # type: ignore[misc]
 tf.print = tf_print

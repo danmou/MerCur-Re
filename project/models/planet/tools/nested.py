@@ -14,10 +14,6 @@
 
 """Tools for manipulating nested tuples, list, and dictionaries."""
 
-from __future__ import absolute_import
-from __future__ import division
-
-
 _builtin_zip = zip
 _builtin_map = map
 _builtin_filter = filter

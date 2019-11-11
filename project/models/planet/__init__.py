@@ -12,13 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from . import control, models, networks, scripts, tools, training
 
-from . import control
-from . import models
-from . import networks
-from . import scripts
-from . import tools
-from . import training
+__all__ = ['control', 'models', 'networks', 'scripts', 'tools', 'training']

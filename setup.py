@@ -3,7 +3,6 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-import os
 import subprocess
 import sys
 
@@ -15,13 +14,13 @@ requirements = [
     'gym==0.10.9',
     'habitat>=0.1.3',
     'loguru',
-    'numpy<1.17',  # 1.17 results in deprecation warnings with TF 1.13
-    'planetrl',
+    'numpy<1.17',  # 1.17 results in deprecation warnings with TF 1.15
     'wandb',
 ]
 
 test_requirements = [
-    'mypy',
+    'mypy>=0.730',
+    'pyflakes>=2.2.0',
     'pytest',
     'pytest-flake8',
     'pytest-isort',
@@ -57,9 +56,8 @@ setup(
     tests_require=test_requirements,
     extras_require={'test': test_requirements},
     dependency_links=[
-        f'file://{os.getcwd()}/planet#egg=planetrl',
-        f'https://github.com/facebookresearch/habitat-api/tarball/master#egg=habitat',
-        f'https://github.com/deepmind/dm_control/tarball/master#egg=dm_control',
+        'https://github.com/facebookresearch/habitat-api/tarball/master#egg=habitat',
+        'https://github.com/deepmind/dm_control/tarball/master#egg=dm_control',
     ],
     entry_points={'console_scripts': ['thesis=project.cli:cli']},
 )

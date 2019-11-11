@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from . import conv_ha
 from .basic import feed_forward
+
+__all__ = ['conv_ha', 'feed_forward']

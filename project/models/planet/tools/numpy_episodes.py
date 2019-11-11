@@ -14,10 +14,6 @@
 
 """Load tensors from a directory of numpy files."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import functools
 import os
 import random
@@ -26,8 +22,7 @@ import numpy as np
 import tensorflow as tf
 from scipy.ndimage import interpolation
 
-from project.models.planet.tools import attr_dict
-from project.models.planet.tools import chunk_sequence
+from project.models.planet.tools import attr_dict, chunk_sequence
 
 
 def numpy_episodes(
@@ -57,8 +52,10 @@ def numpy_episodes(
     test = tf.data.Dataset.from_generator(
         functools.partial(loader, reader, test_dir, shape[0]),
         dtypes, shapes)
-    chunking = lambda x: tf.data.Dataset.from_tensor_slices(
-        chunk_sequence.chunk_sequence(x, shape[1], True, num_chunks))
+
+    def chunking(x):
+        return tf.data.Dataset.from_tensor_slices(
+            chunk_sequence.chunk_sequence(x, shape[1], True, num_chunks))
 
     def sequence_preprocess_fn(sequence):
         if preprocess_fn:

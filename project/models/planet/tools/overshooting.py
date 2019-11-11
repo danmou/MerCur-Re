@@ -12,17 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import functools
 
 import numpy as np
 import tensorflow as tf
 
-from project.models.planet.tools import nested
-from project.models.planet.tools import shape
+from project.models.planet.tools import nested, shape
 
 
 def overshooting(
@@ -92,7 +87,8 @@ def overshooting(
         'mask': tf.sequence_mask(length, max_length, tf.int32),
     }
 
-    progress_fn = lambda tensor: tf.concat([tensor[:, 1:], 0 * tensor[:, :1]], 1)
+    def progress_fn(tensor):
+        return tf.concat([tensor[:, 1:], 0 * tensor[:, :1]], 1)
     other_outputs = tf.scan(
         lambda past_output, _: nested.map(progress_fn, past_output),
         tf.range(amount), first_output)

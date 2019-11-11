@@ -1,4 +1,4 @@
-# evaluate.py: 
+# evaluate.py: Evaluate model
 #
 # (C) 2019, Daniel Mouritzen
 
@@ -9,14 +9,15 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Tuple
 
 import gin
+import gym
 import habitat
 import numpy as np
-import project.models.planet
-import project.models.planet.control.wrappers
 import tensorflow as tf
 import wandb
 from loguru import logger
 
+import project.models.planet
+import project.models.planet.control.wrappers
 from project.environments.habitat import VectorHabitat
 from project.models.planet.scripts.configs import default as planet_config
 from project.models.planet.training.define_model import build_network
@@ -90,7 +91,9 @@ def evaluate(logdir: Path,
             if video:
                 for vid in logdir.glob('episode*.mp4'):
                     wandb.run.summary[vid.stem] = wandb.Video(str(vid), fps=20, format="mp4")
-    if original_config is not None:
+    if existing_env is not None:
+        assert original_config is not None
+        assert original_params is not None
         existing_env.reconfigure(config=original_config, **original_params)
         existing_env.call_at(0, 'enable_curriculum', {'enable': gin.query_parameter('curriculum.enabled')})
 
@@ -107,7 +110,7 @@ def create_env(task: AttrDict, capture_video: bool, seed: Optional[int]) -> Vect
         # Top-down map is expensive to compute, so we only enable it for evaluation.
         config.TASK.MEASUREMENTS.append('TOP_DOWN_MAP')
     config.freeze()
-    env = task.env_ctor()
+    env: VectorHabitat = task.env_ctor()
     return env
 
 
@@ -131,11 +134,11 @@ def reconfigure_env(env: VectorHabitat,
 @measure_time()
 def wrap_env(env: VectorHabitat, task: AttrDict) -> project.models.planet.control.InGraphBatchEnv:
     env.call_at(0, 'enable_curriculum', {'enable': False})
-    env = project.models.planet.control.wrappers.SelectObservations(env, task.observation_components)
-    env = project.models.planet.control.wrappers.SelectMetrics(env, task.metrics)
+    wrapped_env: gym.Env = project.models.planet.control.wrappers.SelectObservations(env, task.observation_components)
+    wrapped_env = project.models.planet.control.wrappers.SelectMetrics(wrapped_env, task.metrics)
     with tf.compat.v1.variable_scope('environment', use_resource=True):
-        env = project.models.planet.control.InGraphBatchEnv(project.models.planet.control.BatchEnv([env], blocking=True))
-    return env
+        batch_env = project.models.planet.control.InGraphBatchEnv(project.models.planet.control.BatchEnv([wrapped_env], blocking=True))
+    return batch_env
 
 
 @measure_time()
@@ -189,7 +192,7 @@ def define_episode(env: project.models.planet.control.InGraphBatchEnv,
                    agent: project.models.planet.control.MPCAgent,
                    ) -> Tuple[tf.Tensor, tf.Tensor, Dict[str, tf.Tensor]]:
     # tf.while_loop supports namedtuples but not dicts, so we define a namedtuple to store the metrics
-    Metrics = namedtuple('Metrics', sorted(env.metrics.keys()))
+    Metrics = namedtuple('Metrics', list(sorted(env.metrics.keys())))  # type: ignore[misc]
 
     assert len(env) == 1
     agent_indices = tf.range(1)
@@ -209,12 +212,12 @@ def define_episode(env: project.models.planet.control.InGraphBatchEnv,
         with tf.control_dependencies([do_step]):
             new_steps = tf.add(steps, 1)
             new_score = tf.add(score, env.reward[0])
-            new_metrics = Metrics(**{k: tf.identity(v[0]) for k, v in env.metrics.items()})
+            new_metrics = Metrics(**{k: tf.identity(v[0]) for k, v in env.metrics.items()})  # type: ignore[call-arg]
         return new_steps, new_score, new_metrics
 
-    initializer = (tf.constant(0),                                        # steps
-                   tf.zeros_like(env.reward[0]),                          # score
-                   Metrics(**{k: v[0] for k, v in env.metrics.items()}))  # metrics
+    initializer = (tf.constant(0),  # steps
+                   tf.zeros_like(env.reward[0]),  # score
+                   Metrics(**{k: v[0] for k, v in env.metrics.items()}))  # type: ignore[call-arg]  # metrics
     num_steps, final_score, final_metrics = tf.while_loop(not_done,
                                                           update_score,
                                                           initializer,

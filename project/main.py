@@ -7,7 +7,7 @@ import datetime
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, Generator, Optional, Tuple, Union
+from typing import Generator, Optional, Tuple, Union
 
 import gin
 import wandb
@@ -16,8 +16,8 @@ import yaml
 from loguru import logger
 from tensorflow.python.util import deprecation
 
-from project.logging_utils import init_logging
 from project.execution import evaluate, train
+from project.logging_utils import init_logging
 
 
 @gin.configurable('main', whitelist=['base_logdir'])
@@ -86,17 +86,19 @@ class Main:
             for file in restored_files:
                 (Path(wandb.run.dir) / file).rename(self.logdir / file)
 
-    def _catch(self, func: Callable[[], Any]) -> None:
+    @contextlib.contextmanager
+    def _catch(self) -> Generator[None, None, None]:
         with logger.catch(BaseException, level='TRACE', reraise=not self.catch_exceptions):
             if self.catch_exceptions:
                 with logger.catch(reraise=self.debug):
-                    func()
+                    yield
             else:
-                func()
+                yield
 
-    def train(self, initial_data: Optional[str]) -> None:
+    def train(self, initial_data: Optional[str] = None) -> None:
         try:
-            self._catch(lambda: train(str(self.logdir), initial_data))
+            with self._catch():
+                train(str(self.logdir), initial_data)
         finally:
             # Make sure all checkpoints get uploaded
             wandb.save(f'{self.logdir}/checkpoint', policy='end')
@@ -111,14 +113,14 @@ class Main:
                  ) -> None:
         if not checkpoint and wandb.run.resumed:
             checkpoint = self.logdir
-        if checkpoint is None:
-            raise ValueError('No checkpoint specified!')
-        self._catch(lambda: evaluate(self.logdir,
-                                     checkpoint,
-                                     num_episodes,
-                                     video,
-                                     seed,
-                                     sync_wandb=wandb.run.resumed and not no_sync))
+        assert checkpoint is not None, 'No checkpoint specified!'
+        with self._catch():
+            evaluate(self.logdir,
+                     checkpoint,
+                     num_episodes,
+                     video,
+                     seed,
+                     sync_wandb=wandb.run.resumed and not no_sync)
 
 
 @contextlib.contextmanager

@@ -7,7 +7,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 import gin
 import tensorflow as tf
@@ -26,7 +26,7 @@ class InterceptHandler(logging.Handler):
     Handler to force stdlib logging to go through loguru
     Based on https://github.com/Delgan/loguru/issues/78
     """
-    def __init__(self, level: int = logging.NOTSET, module_levels: Optional[List[str]] = None):
+    def __init__(self, level: int = logging.NOTSET, module_levels: Optional[Dict[str, str]] = None):
         super().__init__(level)
         self._module_levels = {} if module_levels is None else module_levels
         for mod, lev in self._module_levels.items():
@@ -41,11 +41,14 @@ class InterceptHandler(logging.Handler):
             logger_opt.log(level_, line.rstrip())
 
     @staticmethod
-    def _get_depth():
+    def _get_depth() -> int:
         """Finds out how far back to go in the stack trace to find the original source file"""
-        frame = inspect.currentframe().f_back.f_back
+        try:
+            frame = inspect.currentframe().f_back.f_back  # type: ignore[union-attr]
+        except AttributeError:
+            frame = None
         depth = 1
-        while frame and depth < 20:
+        while frame is not None and depth < 20:
             file = inspect.getsourcefile(frame) or inspect.getfile(frame)
             if file not in [logging.__file__, tf_logging.__file__]:
                 break
@@ -69,7 +72,7 @@ def init_logging(verbosity: str, logdir: Union[str, Path]) -> None:
 
     # Log to stdout and logfiles
     trace_logfile = Path(logdir) / 'trace.log'
-    info_logfile = Path(logdir) / f'info.log'
+    info_logfile = Path(logdir) / 'info.log'
     kwargs: Dict[str, Any] = dict(backtrace=True, diagnose=True, enqueue=True)
     logger.add(trace_logfile, level='TRACE', **kwargs)
     kwargs['format'] = '<level>[{level[0]}] {time:HH:mm:ss}</level> {message}'

@@ -12,18 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from project.models.planet.control import wrappers
 
 
 def random_episodes(env, num_episodes, outdir=None):
+    def policy(env, obs):
+        return env.action_space.sample()
     env = wrappers.CollectGymDataset(env, outdir)
     episodes = [] if outdir else None
     for _ in range(num_episodes):
-        policy = lambda env, obs: env.action_space.sample()
         done = False
         obs = env.reset()
         while not done:

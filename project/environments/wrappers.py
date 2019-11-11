@@ -9,8 +9,9 @@ from typing import Any, Callable, Dict, Tuple, Type, cast
 import gin
 import gym.spaces
 import numpy as np
-import project.models.planet.control.wrappers as planet_wrappers
 from loguru import logger
+
+import project.models.planet.control.wrappers as planet_wrappers
 
 Observations = Dict[str, np.ndarray]
 ObsTuple = Tuple[Observations, float, bool, Dict[str, Any]]  # obs, reward, done, info
@@ -142,7 +143,7 @@ class Curriculum(Wrapper):
 
     @property
     def episode_length(self) -> float:
-        return self.env.habitat_env.current_episode.info["geodesic_distance"]
+        return cast(float, self.env.habitat_env.current_episode.info["geodesic_distance"])
 
     def enable_curriculum(self, enable: bool = True) -> None:
         self._enabled = enable

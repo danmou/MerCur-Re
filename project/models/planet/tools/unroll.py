@@ -12,14 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import tensorflow as tf
 
-from project.models.planet.tools import nested
-from project.models.planet.tools import shape
+from project.models.planet.tools import nested, shape
 
 
 def closed_loop(cell, embedded, prev_action, debug=False):

@@ -3,10 +3,10 @@
 # (C) 2019, Daniel Mouritzen
 
 import random
-from mock import MagicMock
 from pathlib import Path
 from shutil import copyfile
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union, cast
+from unittest.mock import MagicMock
 
 import gin
 import gym.spaces
@@ -43,7 +43,7 @@ class Success(habitat.Measure):
     def reset_metric(self, *args: Any, **kwargs: Any) -> None:
         self._metric = None
 
-    def update_metric(self,  # type: ignore
+    def update_metric(self,  # type: ignore[override]
                       *args: Any,
                       episode: NavigationEpisode,
                       task: habitat.EmbodiedTask,
@@ -64,7 +64,7 @@ class TurnAngle(LookLeft):
 
     angle = 0.0
 
-    def __call__(self, scene_node: habitat_sim.SceneNode, actuation_spec: ActuationSpec):
+    def __call__(self, scene_node: habitat_sim.SceneNode, actuation_spec: ActuationSpec) -> None:
         actuation_spec.amount = TurnAngle.angle
         super().__call__(scene_node, actuation_spec)
 
@@ -74,14 +74,14 @@ class TurnAngleAction(SimulatorTaskAction):
     def _get_uuid(self, *args: Any, **kwargs: Any) -> str:
         return 'turn_angle'
 
-    def step(self, *args: Any, **kwargs: Any) -> ObsTuple:
+    def step(self, *args: Any, **kwargs: Any) -> Observations:  # type: ignore[override]
         return self._sim.step(HabitatSimActions.TURN_ANGLE)
 
 
 @habitat.registry.register_action_space_configuration
 class TurnAngleActionSpace(HabitatSimV1ActionSpaceConfiguration):
-    def get(self):
-        config = super().get()
+    def get(self) -> Dict[int, habitat_sim.ActionSpec]:
+        config: Dict[int, habitat_sim.ActionSpec] = super().get()
         config[HabitatSimActions.TURN_ANGLE] = habitat_sim.ActionSpec('turn_angle', ActuationSpec(0.0))
         return config
 
@@ -157,7 +157,7 @@ class Habitat(habitat.RLEnv):
 
     def distance_to_target(self) -> float:
         current_position = self._env.sim.get_agent_state().position.tolist()
-        target_position = self._env.current_episode.goals[0].position  # type: ignore
+        target_position = self._env.current_episode.goals[0].position  # type: ignore[attr-defined]
         distance = self._env.sim.geodesic_distance(
             current_position, target_position
         )
@@ -174,7 +174,7 @@ class Habitat(habitat.RLEnv):
             metrics['collisions'] = metrics['collisions']['count']
         return metrics
 
-    def step(self, action: Union[np.ndarray, float]) -> ObsTuple:  # type: ignore
+    def step(self, action: Union[np.ndarray, float]) -> ObsTuple:  # type: ignore[override]
         self._called_stop = False
         action = float(action)
         self._step_count += 1
@@ -260,7 +260,7 @@ class DummyHabitat(gym.Env):
         self._image_key = image_key
         self._goal_key = goal_key
         self._reward_function = reward_function
-        self._reward_function.set_env(self)  # type: ignore
+        self._reward_function.set_env(self)
         self.success_distance = config.TASK.SUCCESS_DISTANCE
         self.stop_action: int = HabitatSimActions.STOP
 
@@ -285,7 +285,7 @@ class DummyHabitat(gym.Env):
     def episode_success(self) -> bool:
         return random.random() < 0.05
 
-    def step(self, action: int) -> ObsTuple:  # type: ignore
+    def step(self, action: int) -> ObsTuple:
         obs = self.observation_space.sample()
         reward = self._reward_function.get_reward(obs)
         done = random.random() < 0.05
@@ -300,7 +300,7 @@ class DummyHabitat(gym.Env):
 
     def reset(self) -> Observations:
         self._reward_function.reset()
-        return self.observation_space.sample()
+        return cast(Observations, self.observation_space.sample())
 
 
 class VectorHabitat(VectorEnv):
@@ -315,22 +315,22 @@ class VectorHabitat(VectorEnv):
     def __getattr__(self, name: str) -> Any:
         return self.call_at(0, '__getattr__', {'name': name})
 
-    def save_video(self, file: Union[str, Path], **kwargs) -> None:
+    def save_video(self, file: Union[str, Path], **kwargs: Any) -> None:
         kwargs['file'] = file
         self.call_at(0, 'save_video', kwargs)
 
-    def reconfigure(self, **kwargs) -> None:
+    def reconfigure(self, **kwargs: Any) -> None:
         self.call_at(0, 'reconfigure', kwargs)
 
     def seed(self, seed: int) -> None:
         self.call_at(0, 'seed', {'seed': seed})
 
-    def step(self, action: Any) -> ObsTuple:  # type: ignore
+    def step(self, action: Any) -> ObsTuple:  # type: ignore[override]
         obs, reward, done, info = super().step(data=[{'action': action}])[0]
         return obs, reward, done, info
 
-    def reset(self) -> Observations:  # type: ignore
-        return super().reset()[0]
+    def reset(self) -> Observations:
+        return cast(Observations, super().reset()[0])
 
 
 @gin.configurable('Habitat', whitelist=['task', 'dataset', 'gpu_id', 'image_key', 'goal_key', 'reward_function'])
