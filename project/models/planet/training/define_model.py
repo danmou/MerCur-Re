@@ -26,8 +26,7 @@ def define_model(data, trainer, config, envs):
         global_step=trainer.global_step, data=data)
 
     graph.update(build_network(data, config))
-    summaries, graph_ = apply_network(graph, data, trainer, config)
-    graph.update(graph_)
+    summaries = apply_network(graph, data, trainer, config)
 
     collect_summaries, collect_scores, collect_metrics = define_collection(
         graph, config, cleanups, envs)
@@ -69,15 +68,18 @@ def build_network(data, config):
 
 
 def apply_network(graph, data, trainer, config):
-    embedded = graph.encoder(data)
+    with graph.unlocked():
+        graph.embedded = graph.encoder(data)
     prior, posterior = tools.unroll.closed_loop(
-        graph.cell, embedded, data['action'], config.debug)
+        graph.cell, graph.embedded, data['action'], data['length'], debug=config.debug)
     objectives = utility.compute_objectives(
         posterior, prior, data, graph, config)
     summaries, grad_norms = utility.apply_optimizers(
         objectives, trainer, config)
-    return summaries, tools.AttrDict(
-        embedded=embedded, objectives=objectives, grad_norms=grad_norms)
+    with graph.unlocked():
+        graph.objectives = objectives
+        graph.grad_norms = grad_norms
+    return summaries
 
 
 def define_collection(graph, config, cleanups, envs):

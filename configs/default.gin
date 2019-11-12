@@ -5,6 +5,7 @@ logging.module_levels = {'matplotlib': 'WARNING', 'PIL': 'WARNING', 'imageio_ffm
 # Task
 planet.tasks = ['habitat']
 planet.isolate_envs = 'none'  # Don't change
+planet.min_task_length = 0    # Minimum sequence length
 planet.max_task_length = 150  # Maximum sequence length
 planet.gradient_heads = ['image', 'goal', 'reward']
 planet.train_action_noise = 0.3
@@ -40,7 +41,7 @@ planet.model_size = 200  # belief_size, embed_size
 planet.state_size = 30
 planet.num_layers = 1  # used for reward and goal prediction
 planet.num_units = 100  # used for reward and goal prediction
-planet.batch_shape = [64, 10]  # [batch_size, min_seq_length]
+planet.batch_shape = [64, 64]  # [batch_size, time_batch]
 
 # Planner
 planet.planner = 'cem'

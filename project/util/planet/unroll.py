@@ -17,10 +17,10 @@ import tensorflow as tf
 from project.util.planet import nested, shape
 
 
-def closed_loop(cell, embedded, prev_action, debug=False):
+def closed_loop(cell, embedded, prev_action, sequence_length=None, debug=False):
     use_obs = tf.ones(tf.shape(embedded[:, :, :1])[:3], tf.bool)
     (prior, posterior), _ = tf.nn.dynamic_rnn(
-        cell, (embedded, prev_action, use_obs), dtype=tf.float32)
+        cell, (embedded, prev_action, use_obs), sequence_length, dtype=tf.float32)
     if debug:
         with tf.control_dependencies([tf.compat.v1.assert_equal(
                 tf.shape(nested.flatten(posterior)[0])[1], tf.shape(embedded)[1])]):

@@ -167,7 +167,7 @@ def create_graph(data: Dict[str, tf.Tensor],
         graph.update(build_network(data, config))
         graph.embedded = graph.encoder(data)
         graph.prior, graph.posterior = project.util.planet.unroll.closed_loop(
-            graph.cell, graph.embedded, data['action'], config.debug)
+            graph.cell, graph.embedded, data['action'], debug=config.debug)
     return graph
 
 

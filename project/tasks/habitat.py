@@ -36,12 +36,13 @@ def habitat_task(config: AttrDict,
                                       Callable[[Dict[str, Any]], Dict[str, Any]]]] = gin.REQUIRED,
                  ) -> Task:
     action_repeat = params.get('action_repeat', 1)
+    min_length = params.min_task_length
     max_length = params.max_task_length
     state_components = ['reward']
     observation_components = ['image', 'goal']
     metrics = ['success', 'spl', 'path_length', 'optimal_path_length', 'remaining_distance', 'collisions']
     env_params = {'action_repeat': action_repeat,
-                  'min_duration': config.batch_shape[1],
+                  'min_duration': min_length,
                   'max_duration': max_length,
                   'capture_video': False}
     env_params['wrappers'] = [(Wrapper, kwarg_fn(env_params)) for Wrapper, kwarg_fn in wrappers]

@@ -125,6 +125,7 @@ def compute_objectives(posterior, prior, target, graph, config):
     raw_features = graph.cell.features_from_state(posterior)
     heads = graph.heads
     objectives = []
+    loss_mask = tf.sequence_mask(target['length'], tf.shape(target['reward'])[1])
     for name, scale in config.loss_scales.items():
         if config.loss_scales[name] == 0.0:
             continue
@@ -138,28 +139,25 @@ def compute_objectives(posterior, prior, target, graph, config):
             exclude = None
 
         if name == 'divergence':
-            loss = graph.cell.divergence_from_states(posterior, prior)
+            loss = graph.cell.divergence_from_states(posterior, prior, loss_mask)
             if config.free_nats is not None:
                 loss = tf.maximum(0.0, loss - float(config.free_nats))
             objectives.append(Objective('divergence', loss, min, include, exclude))
-
         elif name == 'overshooting':
-            shape = tools.shape(graph.data['action'])
-            length = tf.tile(tf.constant(shape[1])[None], [shape[0]])
             _, priors, posteriors, mask = tools.overshooting(
-                graph.cell, {}, graph.embedded, graph.data['action'], length,
+                graph.cell, {}, graph.embedded, graph.data['action'], target['length'],
                 config.overshooting_distance, posterior)
             posteriors, priors, mask = tools.nested.map(
                 lambda x: x[:, :, 1:-1], (posteriors, priors, mask))
             if config.os_stop_posterior_grad:
                 posteriors = tools.nested.map(tf.stop_gradient, posteriors)
-            loss = graph.cell.divergence_from_states(posteriors, priors)
+            loss = graph.cell.divergence_from_states(posteriors, priors, loss_mask)
             if config.free_nats is not None:
                 loss = tf.maximum(0.0, loss - float(config.free_nats))
             objectives.append(Objective('overshooting', loss, min, include, exclude))
-
         else:
             logprob = heads[name](features).log_prob(target[name])
+            logprob = tf.boolean_mask(logprob, loss_mask)
             objectives.append(Objective(name, logprob, max, include, exclude))
 
     objectives = [o._replace(value=tf.reduce_mean(o.value)) for o in objectives]

@@ -54,7 +54,7 @@ def define_summaries(graph, config, cleanups):
 
     with tf.compat.v1.variable_scope('closedloop'):
         prior, posterior = tools.unroll.closed_loop(
-            graph.cell, graph.embedded, graph.data['action'], config.debug)
+            graph.cell, graph.embedded, graph.data['action'], debug=config.debug)
         summaries += summary.state_summaries(graph.cell, prior, posterior, mask)
         with tf.compat.v1.variable_scope('prior'):
             prior_features = graph.cell.features_from_state(prior)
