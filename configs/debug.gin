@@ -30,5 +30,6 @@ planet.checkpoint_to_load = None  # can be a dir or a specific file, absolute or
 tf.gpu_options.visible_device_list = '0'
 # tf.debugger = True
 
+curriculum.enabled = False
 Habitat.dataset = 'habitat_test'
 Habitat.gpu_id = 0
