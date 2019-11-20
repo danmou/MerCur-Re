@@ -2,9 +2,12 @@ name: thesis
 channels:
     - conda-forge
 dependencies:
-  - python=3.6
-  - tensorflow=1.13.1
+  - python=3.7
+  - tensorflow-gpu=1.15.*
   - numpy=1.16.*
+  - click
+  - loguru
+  - tqdm
 
   # test dependencies
   - pytest
@@ -16,7 +19,7 @@ dependencies:
   - ruamel.yaml
   - scikit-image
   - scipy
-  - tensorflow-probability=0.6  # (tensorflow_probability)
+  - tensorflow-probability  # (tensorflow_probability)
   - ffmpeg  # needed to create gifs and videos
   - x264  # needed for mp4 videos with ffmpeg
 
@@ -29,20 +32,22 @@ dependencies:
   - pyglet
   - quaternion  # (numpy-quaternion)
   - requests
-  - tqdm
   - yacs
 
   # pip dependencies
   - pip
   - pip:
+    - gin-config
+    - wandb
+
     # test
-    - pytest-mypy
     - pytest-flake8
+    - pytest-isort
+    - pytest-mypy
 
     # planet
     - gym[box2d]==0.10.9
-    - git+git://github.com/deepmind/dm_control.git  # must be before planet
-    - ./planet
+    - git+git://github.com/deepmind/dm_control.git
 
     # habitat
 #    - git+git://github.com/facebookresearch/habitat-sim.git  # https://github.com/conda/conda/issues/9144

@@ -36,11 +36,11 @@ using_GPU = out != ''
 if not using_GPU:
     # For linux wth no GPU, we install the Intel optimized version of TensorFlow
     if sys.platform in ['linux', 'linux2']:
-        requirements.append('intel-tensorflow==1.13.1')
+        requirements.append('intel-tensorflow==1.15.*')
     else:
-        requirements.append('tensorflow==1.13.1')
+        requirements.append('tensorflow==1.15.*')
 else:
-    requirements.append('tensorflow-gpu==1.13.1')
+    requirements.append('tensorflow-gpu==1.15.*')
 
 setup(
     name='master_thesis_mouritzen',
@@ -51,6 +51,7 @@ setup(
     url='https://github.com/uzh-rpg/master_thesis_mouritzen',
     packages=['project', 'configs'],
     include_package_data=True,
+    python_requires='>=3.7',
     install_requires=requirements,
     setup_requires=['pytest-runner'],
     tests_require=test_requirements,

@@ -15,7 +15,7 @@ To be able to run habitat-sim locally:
 ```bash
 sudo apt update && sudo apt install libjpeg-dev libpng-dev libglfw3-dev libglm-dev libx11-dev libomp-dev libegl1-mesa-dev
 # On Debian additionally install libglvnd-dev
-conda create -n thesis python=3.6 cmake=3.14 tensorflow-gpu=1.13.1
+conda create -n thesis python=3.7 cmake=3.14 tensorflow-gpu=1.15
 conda activate thesis
 
 git clone --recurse-submodules https://github.com/facebookresearch/habitat-sim.git
