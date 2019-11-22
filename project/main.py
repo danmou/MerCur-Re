@@ -50,16 +50,17 @@ class Main:
         return logdir
 
     def _create_symlinks(self) -> None:
+        link_dest = self.logdir.relative_to(self.base_logdir)
         latest_symlink = Path(self.base_logdir) / 'latest'
-        if latest_symlink.exists():
+        if latest_symlink.is_symlink():
             latest_symlink.unlink()
-        latest_symlink.symlink_to(self.logdir)
+        latest_symlink.symlink_to(link_dest)
         try:
             wandb_name = wandb.Api().run(wandb.run.path).name
         except wandb.apis.CommError:
             wandb_name = None
         if wandb_name:
-            (Path(self.base_logdir) / wandb_name).symlink_to(self.logdir)
+            (Path(self.base_logdir) / wandb_name).symlink_to(link_dest)
             logger.info(f'W&B run name: {wandb_name}')
 
     def _update_wandb(self) -> None:

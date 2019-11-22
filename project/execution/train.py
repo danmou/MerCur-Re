@@ -12,6 +12,7 @@ from loguru import logger
 from project.models.planet.scripts.train import process as planet_train
 from project.util import AttrDict
 from project.util.planet_interface import PlanetParams
+from project.util.files import link_directory_contents
 
 from .evaluate import evaluate
 
@@ -19,16 +20,13 @@ from .evaluate import evaluate
 @gin.configurable(whitelist=['num_eval_episodes'])
 def train(logdir: str, initial_data: Optional[str], num_eval_episodes: int = 10) -> None:
     params = PlanetParams()
+    dataset_dirs = {name: Path(logdir) / f'{name}_episodes' for name in ['train', 'test']}
     if initial_data:
         with params.unlocked():
             params.num_seed_episodes = 0
         logger.info('Linking initial dataset.')
-        for dataset in ['test_episodes', 'train_episodes']:
-            dest = Path(logdir) / dataset
-            dest.mkdir()
-            for src_file in (Path(initial_data).absolute() / dataset).iterdir():
-                dest_file = dest / src_file.name
-                dest_file.symlink_to(src_file)
+        for dataset in dataset_dirs.values():
+            link_directory_contents(Path(initial_data).absolute().relative_to(dataset) / dataset.name, dataset)
 
     args = AttrDict()
     with args.unlocked():
