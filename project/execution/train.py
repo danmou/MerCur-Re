@@ -8,9 +8,9 @@ from typing import Optional
 import gin
 import tensorflow as tf
 from loguru import logger
-from planet.scripts.train import process as planet_train
 
-from project.models.planet import PlanetParams, AttrDict
+from project.models.planet.scripts.train import process as planet_train
+from project.models.planet_interface import PlanetParams, AttrDict
 from .evaluate import evaluate
 
 

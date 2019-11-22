@@ -11,16 +11,16 @@ from typing import Any, Callable, Dict, Optional, Tuple
 import gin
 import habitat
 import numpy as np
-import planet
-import planet.control.wrappers
+import project.models.planet
+import project.models.planet.control.wrappers
 import tensorflow as tf
 import wandb
 from loguru import logger
-from planet.scripts.configs import default as planet_config
-from planet.training.define_model import build_network
 
 from project.environments.habitat import VectorHabitat
-from project.models.planet import AttrDict, PlanetParams, create_tf_session
+from project.models.planet.scripts.configs import default as planet_config
+from project.models.planet.training.define_model import build_network
+from project.models.planet_interface import AttrDict, PlanetParams, create_tf_session
 from project.util import PrettyPrinter, Statistics, Timer, measure_time
 
 
@@ -56,7 +56,7 @@ def evaluate(logdir: Path,
     graph = create_graph(data, config)
     agent = create_agent(graph, env, collect_params, config, deterministic=seed is not None)
     steps_op, score_op, metrics_op = define_episode(env, agent)
-    logger.debug(f'Graph contains {planet.tools.count_weights()} trainable variables')
+    logger.debug(f'Graph contains {project.models.planet.tools.count_weights()} trainable variables')
     sess = create_tf_session()
     with sess:
         restore_checkpoint(sess, checkpoint, logdir, config.savers[0])
@@ -129,17 +129,17 @@ def reconfigure_env(env: VectorHabitat,
 
 
 @measure_time()
-def wrap_env(env: VectorHabitat, task: AttrDict) -> planet.control.InGraphBatchEnv:
+def wrap_env(env: VectorHabitat, task: AttrDict) -> project.models.planet.control.InGraphBatchEnv:
     env.call_at(0, 'enable_curriculum', {'enable': False})
-    env = planet.control.wrappers.SelectObservations(env, task.observation_components)
-    env = planet.control.wrappers.SelectMetrics(env, task.metrics)
+    env = project.models.planet.control.wrappers.SelectObservations(env, task.observation_components)
+    env = project.models.planet.control.wrappers.SelectMetrics(env, task.metrics)
     with tf.compat.v1.variable_scope('environment', use_resource=True):
-        env = planet.control.InGraphBatchEnv(planet.control.BatchEnv([env], blocking=True))
+        env = project.models.planet.control.InGraphBatchEnv(project.models.planet.control.BatchEnv([env], blocking=True))
     return env
 
 
 @measure_time()
-def create_dummy_data(env: planet.control.InGraphBatchEnv,
+def create_dummy_data(env: project.models.planet.control.InGraphBatchEnv,
                       preprocess_fn: Callable[[tf.Tensor], tf.Tensor],
                       ) -> Dict[str, tf.Tensor]:
     tensors = env.observ.copy()
@@ -161,18 +161,18 @@ def create_graph(data: Dict[str, tf.Tensor],
         graph = AttrDict(_unlocked=True, step=tf.constant(0, dtype=tf.int32, name='step'))
         graph.update(build_network(data, config))
         graph.embedded = graph.encoder(data)
-        graph.prior, graph.posterior = planet.tools.unroll.closed_loop(
+        graph.prior, graph.posterior = project.models.planet.tools.unroll.closed_loop(
             graph.cell, graph.embedded, data['action'], config.debug)
     return graph
 
 
 @measure_time()
 def create_agent(graph: AttrDict,
-                 env: planet.control.InGraphBatchEnv,
+                 env: project.models.planet.control.InGraphBatchEnv,
                  params: AttrDict,
                  config: AttrDict,
                  deterministic: bool,
-                 ) -> planet.control.MPCAgent:
+                 ) -> project.models.planet.control.MPCAgent:
     agent_config = AttrDict(
         cell=graph.cell,
         encoder=graph.encoder,
@@ -181,12 +181,12 @@ def create_agent(graph: AttrDict,
         exploration=params.exploration,
         preprocess_fn=config.preprocess_fn,
         postprocess_fn=config.postprocess_fn)
-    return planet.control.MPCAgent(env, graph.step, False, False, agent_config, deterministic)
+    return project.models.planet.control.MPCAgent(env, graph.step, False, False, agent_config, deterministic)
 
 
 @measure_time()
-def define_episode(env: planet.control.InGraphBatchEnv,
-                   agent: planet.control.MPCAgent,
+def define_episode(env: project.models.planet.control.InGraphBatchEnv,
+                   agent: project.models.planet.control.MPCAgent,
                    ) -> Tuple[tf.Tensor, tf.Tensor, Dict[str, tf.Tensor]]:
     # tf.while_loop supports namedtuples but not dicts, so we define a namedtuple to store the metrics
     Metrics = namedtuple('Metrics', sorted(env.metrics.keys()))
@@ -225,8 +225,8 @@ def define_episode(env: planet.control.InGraphBatchEnv,
 
 def restore_checkpoint(sess: tf.compat.v1.Session, checkpoint: Path, logdir: Path, params: Dict[str, str]) -> None:
     to_initialize = set(sess.graph.get_collection(tf.compat.v1.GraphKeys.LOCAL_VARIABLES) +
-                        planet.tools.filter_variables(include=params.get('exclude')))
-    to_restore = set(planet.tools.filter_variables(**params))
+                        project.models.planet.tools.filter_variables(include=params.get('exclude')))
+    to_restore = set(project.models.planet.tools.filter_variables(**params))
     both = to_initialize.intersection(to_restore)
     assert not both, f'These variables are being initialized and restored: {both}'
     all_vars = set(sess.graph.get_collection(tf.compat.v1.GraphKeys.LOCAL_VARIABLES) +

@@ -1,4 +1,4 @@
-# planet.py: Functionality for interfacing with PlaNet
+# planet_interface.py: Functionality for interfacing with PlaNet
 #
 # (C) 2019, Daniel Mouritzen
 
@@ -8,18 +8,17 @@ from typing import Any, Callable, Dict, Generator, List, Tuple, Type, cast
 import gin
 import gym
 import numpy as np
-import planet.control.wrappers as planet_wrappers
-import planet.tools
-import planet.training
-import planet.training.running
 import tensorflow as tf
 from loguru import logger
-from planet.scripts.configs import tasks_lib
-from planet.scripts.tasks import Task as PlanetTask
-from planet.tools import AttrDict
 from tensorflow.python import debug as tf_debug
 
+import project.models.planet.control.wrappers as planet_wrappers
+import project.models.planet.tools
+import project.models.planet.training
 from project.environments import habitat, wrappers
+from project.models.planet.scripts.configs import tasks_lib
+from project.models.planet.scripts.tasks import Task as PlanetTask
+from project.models.planet.tools import AttrDict
 from project.util import Timer, capture_output
 
 
@@ -61,7 +60,7 @@ def planet_habitat_task(config: AttrDict,
               'capture_video': False}
     params['wrappers'] = [(Wrapper, kwarg_fn(params)) for Wrapper, kwarg_fn in wrappers]
     params.update(habitat.get_config(max_steps=max_length*action_repeat*3))  # times 3 because TURN_ANGLE is really 3 actions
-    env_ctor = planet.tools.bind(habitat.VectorHabitat, habitat_env_ctor, params)
+    env_ctor = project.models.planet.tools.bind(habitat.VectorHabitat, habitat_env_ctor, params)
     return PlanetTask('habitat', env_ctor, max_length, state_components, observation_components, metrics)
 
 
@@ -113,7 +112,7 @@ def create_tf_session(debugger: bool = False) -> tf.compat.v1.Session:
     return sess
 
 
-class PlanetTrainer(planet.training.Trainer):
+class PlanetTrainer(project.models.planet.training.Trainer):
     def iterate(self, max_step: Any = None, sess: Any = None) -> Generator[np.float32, None, None]:
         """Simple patch to replace tf session"""
         sess = create_tf_session()
@@ -137,7 +136,7 @@ def tf_print(*args: Any) -> tf.Tensor:
 
 # Monkey patch PlaNet to add `habitat` task and use loguru instead of print for logging
 tasks_lib.habitat = planet_habitat_task  # type: ignore
-planet.control.wrappers.print = logger.info  # type: ignore
-planet.training.utility.print = logger.info  # type: ignore
-planet.training.trainer.Trainer = PlanetTrainer  # type: ignore
+project.models.planet.control.wrappers.print = logger.info  # type: ignore
+project.models.planet.training.utility.print = logger.info  # type: ignore
+project.models.planet.training.trainer.Trainer = PlanetTrainer  # type: ignore
 tf.print = tf_print

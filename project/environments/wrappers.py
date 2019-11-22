@@ -1,4 +1,4 @@
-# wrappers.py: Additional wrappers to supplement planet.control.wrappers.
+# wrappers.py: Additional wrappers to supplement project.models.planet.control.wrappers.
 # Note: Classes with @gin.configurable decorator are unpicklable and hence can't be used with Habitat's VectorEnv, so
 # instead each class has an associated function that adds the gin-config arguments to a kwargs dict.
 #
@@ -9,7 +9,7 @@ from typing import Any, Callable, Dict, Tuple, Type, cast
 import gin
 import gym.spaces
 import numpy as np
-import planet.control.wrappers as planet_wrappers
+import project.models.planet.control.wrappers as planet_wrappers
 from loguru import logger
 
 Observations = Dict[str, np.ndarray]
