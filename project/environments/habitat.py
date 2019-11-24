@@ -182,8 +182,8 @@ class Habitat(habitat.RLEnv):
         self._step_count += 1
         if self._step_count >= self._max_duration or \
                 self._step_count >= self._min_duration and self.distance_to_target() < self.success_distance:
-            obs, reward, done, info = super().step('STOP')
             self._called_stop = True
+            obs, reward, done, info = super().step('STOP')
             info['taken_action'] = 0.0
         else:
             TurnAngle.angle = action * 90.0 / 2
