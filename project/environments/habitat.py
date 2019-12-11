@@ -19,6 +19,7 @@ import wandb
 from habitat.core.simulator import Observations
 from habitat.core.vector_env import VectorEnv
 from habitat.sims.habitat_simulator.actions import HabitatSimActions, HabitatSimV1ActionSpaceConfiguration
+from habitat.tasks import make_task
 from habitat.tasks.nav.nav import NavigationEpisode, SimulatorTaskAction
 from habitat.utils.visualizations.utils import images_to_video, observations_to_image
 from habitat_sim.agent.controls.controls import ActuationSpec
@@ -140,6 +141,13 @@ class Habitat(habitat.RLEnv):
             np.random.seed(seed)
         with capture_output('habitat_sim'):
             self.habitat_env.reconfigure(config)
+            # Habitat's reconfigure doesn't update the task config, so we do that manually:
+            self.habitat_env._task = make_task(
+                config.TASK.TYPE,
+                config=config.TASK,
+                sim=self.habitat_env._sim,
+                dataset=self.habitat_env._dataset,
+            )
         if seed is not None:
             self.seed(seed)
         if min_duration is not None:
