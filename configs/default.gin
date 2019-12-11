@@ -3,68 +3,76 @@ logging.module_levels = {'matplotlib': 'WARNING', 'PIL': 'WARNING', 'imageio_ffm
 
 ### Planet ###
 # Task
-planet.tasks = ['habitat']
-planet.isolate_envs = 'none'  # Don't change
-planet.min_task_length = 0    # Minimum sequence length
-planet.max_task_length = 150  # Maximum sequence length
-planet.gradient_heads = ['image', 'goal', 'reward']
-planet.train_action_noise = 0.3
+training.tasks = [@habitat_task()]
+numpy_episodes.train_action_noise = 0.3
 
 # Schedule
-planet.num_seed_episodes = 40
-planet.train_collect_every = 1  # epochs per training data collection
-planet.num_train_episodes = 2  # training episodes per data collection
-planet.test_collect_every = 1  # epochs per test data collection
-planet.num_test_episodes = 1  # episodes per test data collection
-planet.train_steps = 100  # training batches per epoch
-planet.test_steps = 1  # test steps per epoch
-planet.log_summaries_every = 3  # epochs between summaries
-planet.max_epochs = 0  # maximum number of epochs
-planet.checkpoint_every = 5  # epochs between checkpoints
-planet.eval_every = 20  # epochs between evaluations
-train.num_eval_episodes = 10  # episodes per evaluation
-planet.checkpoint_to_load = None  # can be a dir or a specific file, absolute or relative to the logdir
-
-# Example: continue from still-gorge-205
-# planet.checkpoint_to_load = '../20191010-114731/00001'
-# planet.checkpoint_load_exclude = [r'.*collect_.*_main_habitat.*']  # For compatibility with old checkpoints
-# planet.max_epochs = 20000
+training.num_seed_episodes = 40
+DataCollectionCallback.period = 1  # epochs per data collection
+DataCollectionCallback.train_episodes = 4  # training episodes per data collection
+DataCollectionCallback.test_episodes = 2  # episodes per test data collection
+training.train_steps = 100  # training batches per epoch
+training.test_steps = 10  # test steps per epoch
+training.num_epochs = 1e4
+CheckpointCallback.period = 5  # epochs between checkpoints
+EvaluateCallback.period = 10  # epochs between evaluations
+EvaluateCallback.num_episodes = 10  # episodes per evaluation
+PredictionSummariesCallback.period = 5
+LoggingCallback.epoch_log_period = 1
+LoggingCallback.epoch_header_period = 5  # how many times to log before reprinting headers
+LoggingCallback.batch_log_period = 10
+LoggingCallback.batch_header_period = 10  # how many times to log before reprinting headers
 
 # Losses
-planet.divergence_scale = 1.0
-planet.image_loss_scale = 1.0
-planet.reward_loss_scale = 10.0
-planet.goal_loss_scale = 10.0
+divergence_loss.free_nats = 3.0
+combine_losses.scales = {
+    'divergence': 1.0,
+    'image_reconstruction': -1.0,
+    'reward_reconstruction': -10.0,
+    'goal_reconstruction': -10.0,
+}
 
 # Model complexity
-planet.model_size = 200  # belief_size, embed_size
-planet.state_size = 30
-planet.num_layers = 1  # used for reward and goal prediction
-planet.num_units = 100  # used for reward and goal prediction
-planet.batch_shape = [64, 64]  # [batch_size, time_batch]
+Model.predictor = @predictors.RSSM()
+predictors.RSSM.state_size = 30
+predictors.RSSM.belief_size = 200
+predictors.RSSM.embed_size = 200
+predictors.RSSM.num_layers = 1
+Model.decoders.num_layers = 1  # used for reward and goal prediction
+Model.decoders.num_units = 100  # used for reward and goal prediction
+training.batch_shape = (64, 64)  # [batch_size, time_batch]
+
+# Optimizer
+# training.optimizer = @tf.keras.optimizers.Adam()
+get_model.optimizer = @optimizers.with_global_norm_clipping()
+optimizers.with_global_norm_clipping.clip_norm = 1000.0
+optimizers.with_global_norm_clipping.optimizer = @tf.keras.optimizers.Adam()
+tf.keras.optimizers.Adam.learning_rate = 1e-3
+tf.keras.optimizers.Adam.epsilon = 1e-4
 
 # Planner
-planet.planner = 'cem'
-planet.planner_horizon = 12
-planet.planner_iterations = 10
-planet.planner_amount = 1000  # number of action sequence samples per iteration
-planet.planner_topk = 100  # number of best samples to use as basis for next iteration
+MPCAgent.planner = @CrossEntropyMethod
+CrossEntropyMethod.horizon = 12
+CrossEntropyMethod.iterations = 10
+CrossEntropyMethod.amount = 1000  # number of action sequence samples per iteration
+CrossEntropyMethod.top_k = 100  # number of best samples to use as basis for next iteration
 
 # TF options
-tf.options.log_device_placement = False
+# tf.options.log_device_placement = False
 # tf.options.device_count = {'GPU': 0, 'CPU': 4}
-tf.debugger = False
+# tf.debugger = False
 
 # GPU options
-tf.gpu_options.allow_growth = True
-tf.gpu_options.visible_device_list = '1'
+tf.gpus.memory_growth = True
+tf.gpus.gpu_ids = [0]
 # tf.gpu_options.per_process_gpu_memory_fraction = 0.5
 
 ### Habitat ###
 # Basic
+habitat_task.max_length = 150  # Maximum sequence length
 habitat_task.wrappers = [@curriculum(),
                          @action_repeat()]
-curriculum.enabled = True
+curriculum.enabled = False
 curriculum.start_threshold = 1.5  # Initial threshold in meters.
 curriculum.initial_delay = 200  # Number of episodes to wait before increasing threshold.
 curriculum.increase_rate = 0.05  # Rate of increase in meters per episode.

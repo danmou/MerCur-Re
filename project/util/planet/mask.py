@@ -15,7 +15,7 @@
 import tensorflow as tf
 
 
-def mask(tensor, mask=None, length=None, value=0, debug=False):
+def apply_mask(tensor, mask=None, length=None, value=0):
     """Set padding elements of a batch of sequences to a constant.
 
     Useful for setting padding elements to zero before summing along the time
@@ -46,7 +46,7 @@ def mask(tensor, mask=None, length=None, value=0, debug=False):
             mask = mask[..., None]
         multiples = [1] * batch_dims + tensor.shape[batch_dims:].as_list()
         mask = tf.tile(mask, multiples)
+        if mask.shape != tensor.shape:
+            pass
         masked = tf.where(mask, tensor, value * tf.ones_like(tensor))
-        if debug:
-            masked = tf.check_numerics(masked, 'masked')
         return masked

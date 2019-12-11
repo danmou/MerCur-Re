@@ -13,8 +13,14 @@ requirements = [
     'gin-config',
     'gym==0.10.9',
     'habitat>=0.1.3',
+    'imageio==2.4.1',  # https://github.com/Zulko/moviepy/issues/960
     'loguru',
+    'matplotlib',
+    'moviepy<1.0',  # required for wandb video summaries
     'numpy<1.17',  # 1.17 results in deprecation warnings with TF 1.15
+    'scikit-image',
+    'scipy',
+    'tqdm',
     'wandb',
 ]
 

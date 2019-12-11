@@ -1,4 +1,5 @@
 # Copyright 2019 The PlaNet Authors. All rights reserved.
+# Modifications copyright 2019 Daniel Mouritzen.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,104 +15,125 @@
 
 """Load tensors from a directory of numpy files."""
 
+from typing import Any, Dict, Generator, Iterable, Optional, Tuple, TypeVar
+
 import functools
 import os
 import random
 
+import gin
 import numpy as np
 import tensorflow as tf
 from scipy.ndimage import interpolation
 
-from project.util.planet import attr_dict, chunk_sequence
+from .chunk_sequence import chunk_sequence
+from .preprocess import preprocess
+
+Episode = Dict[str, np.ndarray]
 
 
-def numpy_episodes(
-        train_dir, test_dir, shape, reader=None, loader=None,
-        num_chunks=None, preprocess_fn=None):
+@gin.configurable(whitelist=['num_chunks', 'loader_update_every', 'train_action_noise'])
+def numpy_episodes(train_dir: str,
+                   test_dir: str,
+                   shape: Tuple[int, int],
+                   num_chunks: Optional[int] = 1,
+                   loader_update_every: int = 1000,
+                   train_action_noise: float = 0.3) -> Tuple[tf.data.Dataset, tf.data.Dataset]:
     """Read sequences stored as compressed Numpy files as a TensorFlow dataset.
 
     Args:
       train_dir: Directory containing NPZ files of the training dataset.
       test_dir: Directory containing NPZ files of the testing dataset.
       shape: Tuple of batch size and chunk length for the datasets.
-      reader: Callable that reads an episode from a NPZ filename.
-      loader: Generator that yields episodes.
+      num_chunks: Number of chunks to extract from each sequence.
+      loader_update_every: Number of episodes between loader cache updates.
+      train_action_noise: Amount of noise to add to actions of training episodes
 
     Returns:
       Structured data from numpy episodes as Tensors.
     """
-    reader = reader or episode_reader
-    loader = loader or cache_loader
-    try:
-        dtypes, shapes = _read_spec(reader, train_dir)
-    except ZeroDivisionError:
-        dtypes, shapes = _read_spec(reader, test_dir)
+    loader = recent_loader
+    dtypes, shapes, _ = _read_spec(train_dir)
     train = tf.data.Dataset.from_generator(
-        functools.partial(loader, reader, train_dir, shape[0]),
+        functools.partial(loader, train_dir, loader_update_every, train_action_noise),
         dtypes, shapes)
     test = tf.data.Dataset.from_generator(
-        functools.partial(loader, reader, test_dir, shape[0]),
+        functools.partial(loader, test_dir, loader_update_every),
         dtypes, shapes)
 
-    def chunking(x):
+    def chunking(x: Dict[str, tf.Tensor]) -> tf.data.Dataset:
         return tf.data.Dataset.from_tensor_slices(
-            chunk_sequence.chunk_sequence(x, shape[1], True, num_chunks))
+            chunk_sequence(x, shape[1], True, num_chunks))
 
-    def sequence_preprocess_fn(sequence):
-        if preprocess_fn:
-            sequence['image'] = preprocess_fn(sequence['image'])
+    def sequence_preprocess_fn(sequence: Dict[str, tf.Tensor]) -> Dict[str, tf.Tensor]:
+        sequence['image'] = preprocess(sequence['image'])
         return sequence
 
-    train = train.flat_map(chunking)
-    train = train.batch(shape[0], drop_remainder=True)
-    train = train.map(sequence_preprocess_fn, 10).prefetch(10)
-    test = test.flat_map(chunking)
-    test = test.batch(shape[0], drop_remainder=True)
-    test = test.map(sequence_preprocess_fn, 10).prefetch(10)
-    return attr_dict.AttrDict(train=train, test=test)
+    train, test = (dataset
+                   .flat_map(chunking)
+                   .batch(shape[0], drop_remainder=True)
+                   .map(sequence_preprocess_fn, tf.data.experimental.AUTOTUNE)
+                   .prefetch(tf.data.experimental.AUTOTUNE)
+                   for dataset in (train, test))
+    return train, test
 
 
-def cache_loader(reader, directory, batch_size, every):
+def cache_loader(directory: str,
+                 update_every: int,
+                 action_noise: Optional[float] = None,
+                 ) -> Generator[Episode, None, None]:
+    """Loads all files into a cache, which is updated after `update_every` episodes"""
     cache = {}
     while True:
-        episodes = _sample(cache.values(), every)
-        for episode in _permuted(episodes, every):
+        episodes = _sample(cache.values(), update_every)
+        for episode in _permuted(episodes, update_every):
             yield episode
-        filenames = tf.compat.v1.gfile.Glob(os.path.join(directory, '*.npz'))
+        filenames = tf.io.gfile.glob(os.path.join(directory, '*.npz'))
         filenames = [filename for filename in filenames if filename not in cache]
         for filename in filenames:
-            cache[filename] = reader(filename)
+            cache[filename] = episode_reader(filename, action_noise=action_noise)
 
 
-def recent_loader(reader, directory, batch_size, every):
+def recent_loader(directory: str,
+                  update_every: int,
+                  action_noise: Optional[float] = None,
+                  ) -> Generator[Episode, None, None]:
+    """Same as cache_loader, but 50% of the episodes come from the latest added set of files"""
     recent = {}
     cache = {}
     while True:
         episodes = []
-        episodes += _sample(recent.values(), every // 2)
-        episodes += _sample(cache.values(), every // 2)
-        for episode in _permuted(episodes, every):
+        episodes += _sample(recent.values(), update_every // 2)
+        episodes += _sample(cache.values(), update_every // 2)
+        for episode in _permuted(episodes, update_every):
             yield episode
         cache.update(recent)
         recent = {}
-        filenames = tf.compat.v1.gfile.Glob(os.path.join(directory, '*.npz'))
+        filenames = tf.io.gfile.glob(os.path.join(directory, '*.npz'))
         filenames = [filename for filename in filenames if filename not in cache]
         for filename in filenames:
-            recent[filename] = reader(filename)
+            recent[filename] = episode_reader(filename, action_noise=action_noise)
 
 
-def reload_loader(reader, directory, batch_size):
+def reload_loader(directory: str,
+                  update_every: Optional[int] = None,
+                  action_noise: Optional[float] = None,
+                  ) -> Generator[Episode, None, None]:
+    """Simple loader without cache"""
     directory = os.path.expanduser(directory)
     while True:
-        filenames = tf.compat.v1.gfile.Glob(os.path.join(directory, '*.npz'))
+        filenames = tf.io.gfile.glob(os.path.join(directory, '*.npz'))
         random.shuffle(filenames)
         for filename in filenames:
-            yield reader(filename)
+            yield episode_reader(filename, action_noise=action_noise)
 
 
-def dummy_loader(reader, directory, batch_size):
+def dummy_loader(directory: str,
+                 update_every: Optional[int] = None,
+                 action_noise: Optional[float] = None,
+                 ) -> Generator[Episode, None, None]:
     random = np.random.RandomState(seed=0)
-    dtypes, shapes, length = _read_spec(reader, directory, True, True)
+    dtypes, shapes, length = _read_spec(directory, numpy_types=True)
     while True:
         episode = {}
         for key in dtypes:
@@ -125,13 +147,17 @@ def dummy_loader(reader, directory, batch_size):
         yield episode
 
 
-def episode_reader(filename, resize=None, max_length=None, action_noise=None):
-    episode = np.load(filename)
+def episode_reader(filename: str,
+                   resize: Optional[float] = None,
+                   max_length: Optional[int] = None,
+                   action_noise: Optional[float] = None,
+                   ) -> Episode:
+    episode: Episode = np.load(filename)
     episode = {key: _convert_type(episode[key]) for key in episode.keys()}
     episode['return'] = np.cumsum(episode['reward'])
     if max_length:
         episode = {key: value[:max_length] for key, value in episode.items()}
-    if resize and resize != 1:
+    if resize and resize != 1.0:
         factors = (1, resize, resize, 1)
         episode['image'] = interpolation.zoom(episode['image'], factors)
     if action_noise:
@@ -141,9 +167,10 @@ def episode_reader(filename, resize=None, max_length=None, action_noise=None):
     return episode
 
 
-def _read_spec(
-        reader, directory, return_length=False, numpy_types=False):
-    episodes = reload_loader(reader, directory, batch_size=1)
+def _read_spec(directory: str,
+               numpy_types: bool = False,
+               ) -> Tuple[Dict[str, Any], Dict[str, Tuple[Optional[int]]], int]:
+    episodes = reload_loader(directory)
     episode = next(episodes)
     episodes.close()
     dtypes = {key: value.dtype for key, value in episode.items()}
@@ -151,14 +178,11 @@ def _read_spec(
         dtypes = {key: tf.as_dtype(value) for key, value in dtypes.items()}
     shapes = {key: value.shape for key, value in episode.items()}
     shapes = {key: (None,) + shape[1:] for key, shape in shapes.items()}
-    if return_length:
-        length = len(episode[list(shapes.keys())[0]])
-        return dtypes, shapes, length
-    else:
-        return dtypes, shapes
+    length = len(episode[list(shapes.keys())[0]])
+    return dtypes, shapes, length
 
 
-def _convert_type(array):
+def _convert_type(array: np.ndarray) -> np.ndarray:
     if array.dtype == np.float64:
         return array.astype(np.float32)
     if array.dtype == np.int64:
@@ -166,13 +190,16 @@ def _convert_type(array):
     return array
 
 
-def _sample(sequence, amount):
+T = TypeVar('T')
+
+
+def _sample(sequence: Iterable[T], amount: int) -> Iterable[T]:
     sequence = list(sequence)
     amount = min(amount, len(sequence))
     return random.sample(sequence, amount)
 
 
-def _permuted(sequence, amount):
+def _permuted(sequence: Iterable[T], amount: int) -> Generator[T, None, None]:
     sequence = list(sequence)
     if not sequence:
         return

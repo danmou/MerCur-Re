@@ -2,6 +2,8 @@
 #
 # (C) 2019, Daniel Mouritzen
 
+from __future__ import annotations
+
 import random
 from pathlib import Path
 from shutil import copyfile
@@ -227,7 +229,7 @@ class Habitat(habitat.RLEnv):
 
     _ObsOrDict = TypeVar('_ObsOrDict', Observations, Dict['str', Any])
 
-    def _update_keys(self, obs: '_ObsOrDict') -> '_ObsOrDict':
+    def _update_keys(self, obs: _ObsOrDict) -> _ObsOrDict:
         obs_dict = {'image': obs[self._image_key],
                     'goal': obs[self._goal_key]}
         # Convert back to original type (Observations.__init__ tries to process the input dict)
@@ -239,7 +241,7 @@ class Habitat(habitat.RLEnv):
         with capture_output('habitat_sim'):
             self._env.close()
 
-    @measure_time()
+    @measure_time
     def save_video(self, file: Union[str, Path], fps: int = 10) -> None:
         assert self._capture_video, 'Not capturing video; nothing to save.'
         if len(self._rgb_frames) == 0:
@@ -313,8 +315,13 @@ class VectorHabitat(VectorEnv):
         super().__init__(env_ctor, [tuple(params.items())], auto_reset_done=auto_reset_done, multiprocessing_start_method='fork')
         self.observation_space = self.observation_spaces[0]
         self.action_space = self.action_spaces[0]
+        self._valid_attrs = {'observation_space', 'action_space', 'reward_range', 'metadata', 'reward_range', 'spec',
+                             '_config', '_capture_video', '_min_duration'}
+        self._valid_attrs |= set(Habitat.__dict__.keys())
 
     def __getattr__(self, name: str) -> Any:
+        if name not in self._valid_attrs:
+            raise AttributeError(f'Invalid attribute {name}')
         return self.call_at(0, '__getattr__', {'name': name})
 
     def save_video(self, file: Union[str, Path], **kwargs: Any) -> None:
@@ -333,6 +340,12 @@ class VectorHabitat(VectorEnv):
 
     def reset(self) -> Observations:
         return cast(Observations, super().reset()[0])
+
+    def close(self) -> None:
+        try:
+            super().close()
+        except (BrokenPipeError, EOFError):
+            pass
 
 
 @gin.configurable('Habitat', whitelist=['task', 'dataset', 'gpu_id', 'image_key', 'goal_key', 'reward_function'])

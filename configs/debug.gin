@@ -1,35 +1,35 @@
 include 'configs/default.gin'
 
 main.base_logdir = 'debug_logs'
+# Model.disable_tf_optimization = True
 
-planet.num_seed_episodes = 1
-planet.train_steps = 2
-planet.test_steps = 2
-planet.max_epochs = 2  # Maximum number of epochs
-planet.max_task_length = 10  # Maximum sequence length
-planet.train_collect_every = 1  # epochs per training data collection
-planet.num_train_episodes = 1  # training episodes per data collection
-planet.test_collect_every = 1  # epochs per test data collection
-planet.num_test_episodes = 1  # episodes per test data collection (these are also used for evaluation)
-planet.checkpoint_every = 2  # epochs between checkpoints
-planet.eval_every = 2  # epochs between evaluations
-train.num_eval_episodes = 2  # episodes per evaluation
-planet.model_size = 10
-planet.state_size = 5
-planet.num_layers = 1
-planet.num_units = 10
-planet.batch_shape = [2, 10]  # [batch_size, time_batch]
-planet.loader_every = 5
-planet.loader_window = 2
-planet.planner_amount = 5
-planet.planner_topk = 2
-planet.planner_iterations = 2
-planet.checkpoint_to_load = None  # can be a dir or a specific file, absolute or relative to the logdir
+training.num_seed_episodes = 1
+training.num_epochs = 2
+training.train_steps = 2
+training.test_steps = 2
+DataCollectionCallback.period = 1  # epochs per data collection
+DataCollectionCallback.train_episodes = 1  # training episodes per data collection
+DataCollectionCallback.test_episodes = 1  # episodes per test data collection
+CheckpointCallback.period = 2  # epochs between checkpoints
+EvaluateCallback.period = 2  # epochs between evaluations
+EvaluateCallback.num_episodes = 1  # episodes per evaluation
+PredictionSummariesCallback.period = 1
+predictors.RSSM.state_size = 5
+predictors.RSSM.belief_size = 10
+predictors.RSSM.embed_size = 10
+predictors.RSSM.num_layers = 1
+Model.decoders.num_layers = 1
+Model.decoders.num_units = 10
+training.batch_shape = (2, 10)  # [batch_size, time_batch]
+numpy_episodes.loader_update_every = 5
+CrossEntropyMethod.horizon = 10
+CrossEntropyMethod.iterations = 2
+CrossEntropyMethod.amount = 5
+CrossEntropyMethod.top_k = 2
 
-# tf.options.log_device_placement = True
-tf.gpu_options.visible_device_list = '0'
-# tf.debugger = True
+tf.gpus.gpu_ids = [0]
 
 curriculum.enabled = False
-Habitat.dataset = 'habitat_test'
+habitat_task.max_length = 10
+Habitat.dataset = 'habitat_test_single'
 Habitat.gpu_id = 0

@@ -4,7 +4,6 @@
 
 import os
 import textwrap
-from pathlib import Path
 from typing import Any, Callable, Optional, Tuple
 
 import click
@@ -24,6 +23,7 @@ def with_global_options(func: Callable[..., None]) -> Callable[..., None]:
     @click.option('--verbosity', default='INFO')
     @click.option('-d', '--debug', is_flag=True, help='Disable W&B syncing and enable debug config')
     @click.option('--gpus', default=None)
+    @click.option('-m', '--model', help='Model checkpoint to load. Can be a dir or a specific file')
     @click.argument('extra_options', nargs=-1)
     def wrapper(config: Optional[str],
                 logdir: Optional[str],
@@ -32,6 +32,7 @@ def with_global_options(func: Callable[..., None]) -> Callable[..., None]:
                 verbosity: str,
                 debug: bool,
                 gpus: Optional[str],
+                model: Optional[str],
                 extra_options: Tuple[str, ...],
                 **kwargs: Any,
                 ) -> None:
@@ -52,9 +53,9 @@ def with_global_options(func: Callable[..., None]) -> Callable[..., None]:
             os.environ['CUDA_VISIBLE_DEVICES'] = '0'
         if gpus is not None:
             os.environ['CUDA_VISIBLE_DEVICES'] = gpus
-        return func(config, data, verbosity, debug, extra_options, **kwargs)
+        return func(config, data, verbosity, debug, model, extra_options, **kwargs)
     wrapper.__doc__ = textwrap.dedent(func.__doc__ or '') + "\n\nEXTRA_OPTIONS is one or more additional " \
-                                                            "gin-config options, e.g. 'planet.max_epochs=200'"
+                                                            "gin-config options, e.g. 'training.num_epochs=200'"
     wrapper.__click_params__ += getattr(func, '__click_params__', [])  # type: ignore[attr-defined]
     return wrapper
 
@@ -73,17 +74,17 @@ def train_command(config: str,
                   data: Optional[str],
                   verbosity: str,
                   debug: bool,
+                  checkpoint: Optional[str],
                   extra_options: Tuple[str, ...],
                   initial_data: Optional[str],
                   ) -> None:
     """Run training."""
-    with main_configure(config, extra_options, verbosity, debug, data=data) as main:
+    with main_configure(config, extra_options, verbosity, debug, checkpoint, data=data) as main:
         main.train(initial_data)
 
 
 @cli.command(name='evaluate')
 @with_global_options
-@click.option('-m', '--model', help='Model checkpoint to load. Can be a dir or a specific file')
 @click.option('--wandb-run', help='W&B run to evaluate. Can be full id or part of name '
                                   '(the latest matching run will be used)')
 @click.option('-n', '--num-episodes', type=int, default=10, help='Number of episodes to evaluate on')
@@ -94,8 +95,8 @@ def evaluate_command(config: str,
                      data: Optional[str],
                      verbosity: str,
                      debug: bool,
+                     checkpoint: Optional[str],
                      extra_options: Tuple[str, ...],
-                     model: Optional[str],
                      wandb_run: Optional[str],
                      num_episodes: int,
                      no_video: bool,
@@ -103,15 +104,14 @@ def evaluate_command(config: str,
                      no_sync: bool,
                      ) -> None:
     """Evaluate checkpoint."""
-    # assert model or wandb_run, 'Either --model or --wandb-run must be specified!'
     if not wandb_run:
         os.environ[wandb.env.MODE] = 'dryrun'
-    model_path = None if model is None else Path(model)
     with main_configure(config,
                         extra_options,
                         verbosity,
                         debug,
+                        checkpoint,
                         data=data,
                         job_type='eval',
                         wandb_continue=wandb_run) as main:
-        main.evaluate(model_path, num_episodes, not no_video, seed, no_sync)
+        main.evaluate(num_episodes, not no_video, seed, no_sync)

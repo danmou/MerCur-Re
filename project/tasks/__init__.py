@@ -3,7 +3,8 @@
 # (C) 2019, Daniel Mouritzen
 
 from .habitat import habitat_task as habitat
-from .planet_tasks import (cartpole_balance,
+from .planet_tasks import (Task,
+                           cartpole_balance,
                            cartpole_swingup,
                            cheetah_run,
                            cup_catch,
@@ -14,6 +15,7 @@ from .planet_tasks import (cartpole_balance,
                            walker_walk)
 
 __all__ = ['habitat',
+           'Task',
            'cartpole_balance',
            'cartpole_swingup',
            'cheetah_run',

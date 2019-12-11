@@ -3,19 +3,19 @@ method: random
 parameters:
   planet.max_epochs:
     value: 60
-  planet.planner_horizon:
+  cross_entropy_method.horizon:
     distribution: q_log_uniform
     min: 1.6  # 5
     max: 3.92  # 50
-  planet.planner_iterations:
+  cross_entropy_method.iterations:
     distribution: q_log_uniform
     min: 1.6  # 5
     max: 3.92  # 50
-  planet.planner_amount:
+  cross_entropy_method.amount:
     distribution: q_log_uniform
     min: 4.61  # 100
     max: 9.2103  # 5e3
-  planet.planner_topk:
+  cross_entropy_method.top_k:
     distribution: q_log_uniform
     min: 2.3  # 10
     max: 6.215  # 500

@@ -17,7 +17,7 @@ import datetime
 import io
 import os
 import uuid
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, Union
 
 import gin
 import gym
@@ -26,8 +26,6 @@ import numpy as np
 import skimage.transform
 import tensorflow as tf
 from loguru import logger
-
-from project.util.planet import nested
 
 from .base import Action, Observations, ObsTuple, Reward, Wrapper
 
@@ -336,12 +334,14 @@ class CollectGymDataset(Wrapper):
         observ, reward, done, info = super().step(action)
         transition = self._process_observ(observ).copy()
         transition['action'] = action
-        transition['taken_action'] = info.get('taken_action')
         transition['reward'] = reward
+        for key in ['taken_action', 'success']:
+            # Optional items
+            if key in info:
+                transition[key] = info[key]
         self._episode.append(transition)
         if done:
             episode = self._get_episode()
-            # info['episode'] = episode
             if self._outdir:
                 filename = self._get_filename()
                 self._write(episode, filename)
@@ -352,9 +352,6 @@ class CollectGymDataset(Wrapper):
         # The action and reward are not known for this time step, so we zero them.
         observ = super().reset()
         transition: Dict[str, Any] = self._process_observ(observ).copy()
-        transition['action'] = np.zeros_like(self.action_space.low)
-        transition['taken_action'] = None
-        transition['reward'] = 0.0
         self._episode = [transition]
         return observ
 
@@ -372,30 +369,28 @@ class CollectGymDataset(Wrapper):
         return filename
 
     def _get_episode(self) -> Dict[str, np.ndarray]:
-        episode = {k: [t[k] for t in self._episode] for k in self._episode[0]}
-        if episode['taken_action'][-1] is None:
-            episode.pop('taken_action')
-        elif episode['taken_action'][0] is None:
-            episode['taken_action'][0] = np.zeros_like(episode['taken_action'][-1])
-        np_episode = {k: np.array(v) for k, v in episode.items()}
+        for k in self._episode[-1]:
+            if k not in self._episode[0]:
+                # First transition only has observation, so we put zeros for the other items
+                self._episode[0][k] = np.zeros_like(self._episode[-1][k])
+        np_episode = {k: np.array([t[k] for t in self._episode]) for k in self._episode[0]}
         for key, sequence in np_episode.items():
             if sequence.dtype == 'object':
-                message = "Sequence '{}' is not numeric:\n{}"
-                raise RuntimeError(message.format(key, sequence))
+                raise RuntimeError(f"Sequence '{key}' is not numeric:\n{sequence}")
         return np_episode
 
     def _write(self, episode: Dict[str, np.ndarray], filename: str) -> None:
         assert self._outdir is not None
-        if not tf.compat.v1.gfile.Exists(self._outdir):
-            tf.compat.v1.gfile.MakeDirs(self._outdir)
+        if not tf.io.gfile.exists(self._outdir):
+            tf.io.gfile.makedirs(self._outdir)
         with io.BytesIO() as file_:
             np.savez_compressed(file_, **episode)
             file_.seek(0)
-            with tf.compat.v1.gfile.Open(filename, 'w') as ff:
+            with tf.io.gfile.GFile(filename, 'w') as ff:
                 ff.write(file_.read())
         folder = os.path.basename(self._outdir)
         name = os.path.splitext(os.path.basename(filename))[0]
-        logger.info('Recorded episode {} to {}.'.format(name, folder))
+        logger.debug('Recorded episode {} to {}.'.format(name, folder))
 
 
 class ConvertTo32Bit(Wrapper):
@@ -403,13 +398,13 @@ class ConvertTo32Bit(Wrapper):
 
     def step(self, action: Action) -> ObsTuple:
         observ, reward, done, info = super().step(action)
-        observ = nested.map(self._convert_observ, observ)
+        observ = tf.nest.map_structure(self._convert_observ, observ)
         reward = self._convert_reward(reward)
         return observ, reward, done, info
 
     def reset(self) -> Observations:
         observ = super().reset()
-        observ = nested.map(self._convert_observ, observ)
+        observ = tf.nest.map_structure(self._convert_observ, observ)
         return observ
 
     def _convert_observ(self, observ: np.ndarray) -> np.ndarray:

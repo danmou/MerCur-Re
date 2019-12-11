@@ -3,13 +3,15 @@
 # (C) 2019, Daniel Mouritzen
 
 import contextlib
-import datetime
 import os
+from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Generator, Optional, Tuple, Union
 
 import gin
+import gin.tf.external_configurables
+import tensorflow as tf
 import wandb
 import wandb.settings
 import yaml
@@ -24,13 +26,15 @@ from project.util.logging import init_logging
 class Main:
     def __init__(self,
                  verbosity: str,
-                 base_logdir: Union[str, Path] = gin.REQUIRED,
                  debug: bool = False,
                  catch_exceptions: bool = True,
                  extension: Optional[str] = None,
+                 checkpoint: Optional[Path] = None,
+                 base_logdir: Union[str, Path] = gin.REQUIRED,
                  ) -> None:
         deprecation._PRINT_DEPRECATION_WARNINGS = False
         self.debug = debug
+        self.checkpoint = checkpoint
         self.catch_exceptions = catch_exceptions
         self.base_logdir = Path(base_logdir)
         self.logdir = self._create_logdir(extension)
@@ -40,9 +44,11 @@ class Main:
         else:
             self._create_symlinks()
             self._update_wandb()
+        if not tf.executing_eagerly():
+            tf.compat.v1.enable_eager_execution()
 
     def _create_logdir(self, extension: Optional[str]) -> Path:
-        logdir_name = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        logdir_name = f'{datetime.now():%Y%m%d-%H%M%S}'
         if extension:
             logdir_name += f'-{extension}'
         logdir = self.base_logdir / logdir_name
@@ -99,28 +105,28 @@ class Main:
     def train(self, initial_data: Optional[str] = None) -> None:
         try:
             with self._catch():
-                train(str(self.logdir), initial_data)
+                initial_data_path = initial_data and Path(initial_data)
+                train(self.logdir, initial_data_path, checkpoint=self.checkpoint)
         finally:
             # Make sure all checkpoints get uploaded
             wandb.save(f'{self.logdir}/checkpoint', policy='end')
             wandb.save(f'{self.logdir}/*.ckpt*', policy='end')
 
     def evaluate(self,
-                 checkpoint: Optional[Path] = None,
                  num_episodes: int = 10,
                  video: bool = True,
                  seed: Optional[int] = None,
                  no_sync: bool = False,
                  ) -> None:
-        if not checkpoint and wandb.run.resumed:
-            checkpoint = self.logdir
-        assert checkpoint is not None, 'No checkpoint specified!'
+        if not self.checkpoint and wandb.run.resumed:
+            self.checkpoint = self.logdir
+        assert self.checkpoint is not None, 'No checkpoint specified!'
         with self._catch():
-            evaluate(self.logdir,
-                     checkpoint,
-                     num_episodes,
-                     video,
-                     seed,
+            evaluate(logdir=self.logdir,
+                     checkpoint=self.checkpoint,
+                     num_episodes=num_episodes,
+                     video=video,
+                     seed=seed,
                      sync_wandb=wandb.run.resumed and not no_sync)
 
 
@@ -129,6 +135,7 @@ def main_configure(config: str,
                    extra_options: Tuple[str, ...],
                    verbosity: str,
                    debug: bool = False,
+                   checkpoint: Optional[str] = None,
                    catch_exceptions: bool = True,
                    job_type: str = 'training',
                    data: Optional[str] = None,
@@ -140,7 +147,7 @@ def main_configure(config: str,
         resume_args = dict(resume=True, id=run.id, name=run.name, config=run.config, notes=run.notes, tags=run.tags)
     else:
         resume_args = {}
-    wandb.init(sync_tensorboard=True, job_type=job_type, **resume_args)
+    wandb.init(sync_tensorboard=False, job_type=job_type, **resume_args)
     gin.parse_config_files_and_bindings([config], extra_options)
     with gin.unlock_config():
         gin.bind_parameter('main.base_logdir', str(Path(gin.query_parameter('main.base_logdir')).absolute()))
@@ -148,6 +155,8 @@ def main_configure(config: str,
         f.write(open(config).read())
         f.write('\n# Extra options\n')
         f.write('\n'.join(extra_options))
+    if checkpoint is not None:
+        checkpoint = Path(checkpoint).absolute()
     tempdir = None
     try:
         if data:
@@ -155,7 +164,11 @@ def main_configure(config: str,
             tempdir = TemporaryDirectory()
             (Path(tempdir.name) / 'data').symlink_to(Path(data).absolute())
             os.chdir(tempdir.name)
-        yield Main(verbosity, debug=debug, catch_exceptions=catch_exceptions, extension=extension)
+        yield Main(verbosity,
+                   debug=debug,
+                   catch_exceptions=catch_exceptions,
+                   extension=extension,
+                   checkpoint=checkpoint)
     finally:
         if tempdir:
             tempdir.cleanup()

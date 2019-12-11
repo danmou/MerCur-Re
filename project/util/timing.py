@@ -3,7 +3,7 @@
 # (C) 2019, Daniel Mouritzen
 
 import time
-from typing import Any, Callable, Optional, cast
+from typing import Any, Callable, Optional, cast, overload
 
 from loguru import logger
 
@@ -18,7 +18,23 @@ class Timer:
         self.interval = self.end - self.start
 
 
-def measure_time(log_fn: Callable[[str], None] = logger.debug, name: Optional[str] = None) -> Callable[[Callable], Callable]:
+@overload
+def measure_time(func: Callable = ..., *,
+                 log_fn: Callable[[str], None] = ...,
+                 name: Optional[str] = ...
+                 ) -> Callable:
+    ...
+
+
+@overload
+def measure_time(func: None = ..., *,
+                 log_fn: Callable[[str], None] = ...,
+                 name: Optional[str] = ...
+                 ) -> Callable[[Callable], Callable]:
+    ...
+
+
+def measure_time(func=None, *, log_fn=logger.debug, name=None):
     def wrapper(fn: Callable) -> Callable:
         def timed(*args: Any, **kwargs: Any) -> Any:
             with Timer() as t:
@@ -27,4 +43,6 @@ def measure_time(log_fn: Callable[[str], None] = logger.debug, name: Optional[st
             log_fn(f'Call to {fn_name} finished in {t.interval:.3g}s')
             return result
         return cast(Callable, timed)
+    if func:
+        return wrapper(func)
     return wrapper

@@ -7,10 +7,7 @@ from typing import Any, Dict, Tuple, Union, cast
 import gym
 import numpy as np
 
-Action = Union[int, np.ndarray]
-Observations = Union[np.ndarray, Dict[str, np.ndarray]]
-Reward = Union[float, np.ndarray]
-ObsTuple = Tuple[Observations, Reward, bool, Dict[str, Any]]  # obs, reward, done, info
+from project.util.typing import Action, Observations, ObsTuple, Reward
 
 
 class Wrapper(gym.Wrapper):

@@ -14,16 +14,11 @@ from pathlib import Path
 from typing import Any, Dict, Generator, Optional, Union, cast
 
 import gin
-import tensorflow as tf
 import wandb
 from loguru import logger
 from tensorflow.python import logging as tf_logging
 
 libc = ctypes.cdll.LoadLibrary(cast(str, find_library('c')))
-
-# Silence contrib deprecation warning (https://github.com/tensorflow/tensorflow/issues/27045)
-# Must be before PlaNet import
-tf.contrib._warning = None
 
 
 @gin.configurable('logging', whitelist=['module_levels'])
@@ -81,7 +76,7 @@ def init_logging(verbosity: str, logdir: Union[str, Path]) -> None:
     info_logfile = Path(logdir) / 'info.log'
     kwargs: Dict[str, Any] = dict(backtrace=True, diagnose=True, enqueue=True)
     logger.add(trace_logfile, level='TRACE', **kwargs)
-    kwargs['format'] = '<level>[{level[0]}] {time:HH:mm:ss}</level> {message}'
+    kwargs['format'] = '<level>[{level.name[0]}] {time:HH:mm:ss}</level> {message}'
     logger.add(info_logfile, level='INFO', **kwargs)
     logger.add(sys.stdout, level=verbosity, **kwargs)
     wandb.save(str(trace_logfile))

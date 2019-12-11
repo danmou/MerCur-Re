@@ -12,21 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import gin
 import tensorflow as tf
 
 
-def preprocess(image, bits):
+@gin.configurable(whitelist=['bits'])
+def preprocess(image: tf.Tensor, bits: int = 5) -> tf.Tensor:
     bins = 2 ** bits
-    image = tf.to_float(image)
+    image = tf.cast(image, tf.float32)
     if bits < 8:
         image = tf.floor(image / 2 ** (8 - bits))
     image = image / bins
-    image = image + tf.compat.v1.random_uniform(tf.shape(image), 0, 1.0 / bins)
+    image = image + tf.random.uniform(tf.shape(image), 0, 1.0 / bins)
     image = image - 0.5
     return image
 
 
-def postprocess(image, bits, dtype=tf.float32):
+@gin.configurable(whitelist=['bits'])
+def postprocess(image: tf.Tensor, bits: int = 5, dtype=tf.float32) -> tf.Tensor:
     bins = 2 ** bits
     if dtype == tf.float32:
         image = tf.floor(bins * (image + 0.5)) / bins

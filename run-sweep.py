@@ -6,7 +6,6 @@
 import os
 import random
 import string
-import sys
 import time
 from multiprocessing import Process
 from typing import Any, Dict, List, Optional, cast
@@ -15,7 +14,6 @@ import click
 import wandb
 import yaml
 
-sys.path.append('planet')
 from project.main import main_configure
 
 

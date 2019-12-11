@@ -12,13 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Chunk sequences into fixed lengths."""
+from typing import Dict, Optional
+
 import tensorflow as tf
 
-from project.util.planet import nested
 
-
-def chunk_sequence(sequence, chunk_length, randomize=True, num_chunks=None):
+def chunk_sequence(sequence: Dict[str, tf.Tensor],
+                   chunk_length: int,
+                   randomize: bool = True,
+                   num_chunks: Optional[int] = None,
+                   ) -> Dict[str, tf.Tensor]:
     """Split a nested dict of sequence tensors into a batch of chunks.
 
     This function does not expect a batch of sequences, but a single sequence. A
@@ -43,13 +46,13 @@ def chunk_sequence(sequence, chunk_length, randomize=True, num_chunks=None):
         if 'length' in sequence:
             length = sequence.pop('length')
         else:
-            length = tf.shape(nested.flatten(sequence)[0])[0]
+            length = tf.shape(tf.nest.flatten(sequence)[0])[0]
 
         def pad_sequence(tensor):
             pad_amount = tf.maximum(0, chunk_length - length)
             paddings = [[0, pad_amount]] + [[0, 0]] * (len(tensor.shape) - 1)
             return tf.pad(tensor, paddings)
-        sequence = nested.map(pad_sequence, sequence)
+        sequence = tf.nest.map_structure(pad_sequence, sequence)
 
         if randomize:
             if num_chunks is None:
@@ -58,7 +61,7 @@ def chunk_sequence(sequence, chunk_length, randomize=True, num_chunks=None):
                 num_chunks = num_chunks + 0 * length
             used_length = num_chunks * chunk_length
             max_offset = tf.maximum(0, length - used_length)
-            offset = tf.compat.v1.random_uniform((), 0, max_offset + 1, dtype=tf.int32)
+            offset = tf.random.uniform((), 0, max_offset + 1, dtype=tf.int32)
         else:
             if num_chunks is None:
                 num_chunks = length // chunk_length
@@ -66,18 +69,9 @@ def chunk_sequence(sequence, chunk_length, randomize=True, num_chunks=None):
                 num_chunks = num_chunks + 0 * length
             used_length = num_chunks * chunk_length
             offset = 0
-        assertions = [tf.assert_greater_equal(
-            tf.shape(t)[0],
-            offset + used_length,
-            message='The sequence is too short for the requested number of chunks!'
-        ) for t in sequence.values()]
-        with tf.control_dependencies(assertions):
-            clipped = nested.map(
-                lambda tensor: tensor[offset: offset + used_length],
-                sequence)
-        chunks = nested.map(
-            lambda tensor: tf.reshape(
-                tensor, [num_chunks, chunk_length] + tensor.shape[1:].as_list()),
+        clipped = tf.nest.map_structure(lambda tensor: tensor[offset: offset + used_length], sequence)
+        chunks = tf.nest.map_structure(
+            lambda tensor: tf.reshape(tensor, [num_chunks, chunk_length] + tensor.shape[1:].as_list()),
             clipped)
         chunks['length'] = tf.minimum(chunk_length, length) * tf.ones((num_chunks,), dtype=tf.int32)
         return chunks

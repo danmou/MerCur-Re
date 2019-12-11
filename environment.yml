@@ -3,25 +3,23 @@ channels:
     - conda-forge
 dependencies:
   - python=3.7
-  - tensorflow-gpu=1.15.*
+  - tensorflow-gpu=2.0.*
   - numpy=1.16.*
   - click
   - loguru
+  - matplotlib
+  - scikit-image
+  - scipy
+  - tensorflow-probability>=0.8
   - tqdm
+  - ffmpeg  # needed to create gifs and videos
+  - x264  # needed for mp4 videos with ffmpeg
+  - moviepy  # needed to create gifs and videos
 
   # test dependencies
   - pytest
   - pytest-runner
   - mypy
-
-  # planet dependencies
-  - matplotlib
-  - ruamel.yaml
-  - scikit-image
-  - scipy
-  - tensorflow-probability  # (tensorflow_probability)
-  - ffmpeg  # needed to create gifs and videos
-  - x264  # needed for mp4 videos with ffmpeg
 
   # habitat dependencies
   - attrs
@@ -37,7 +35,7 @@ dependencies:
   # pip dependencies
   - pip
   - pip:
-    - gin-config
+    - gin-config!=0.2.1
     - wandb
 
     # test
