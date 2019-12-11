@@ -43,7 +43,10 @@ def train(logdir: Path,
     sims = {}
     for task in tasks:
         envs[task.name] = task.env_ctor()
-        sims[task.name] = {phase: Simulator(envs[task.name], metrics=task.metrics, save_dir=logdir / f'{phase}_episodes')
+        sims[task.name] = {phase: Simulator(envs[task.name],
+                                            metrics=task.metrics,
+                                            save_dir=logdir / f'{phase}_episodes',
+                                            save_data=True)
                            for phase in ['train', 'test']}
 
     distribution_strategy = get_distribution_strategy()

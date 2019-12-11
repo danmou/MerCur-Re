@@ -3,7 +3,7 @@
 # (C) 2019, Daniel Mouritzen
 
 from pathlib import Path
-from typing import Any, Dict, Optional, Sequence, Tuple, Union, cast
+from typing import Dict, Optional, Sequence, Tuple, Union, cast
 
 import gym
 import gym.spaces
@@ -30,14 +30,17 @@ class Simulator:
                  env: gym.Env,
                  metrics: Optional[Sequence[str]] = None,
                  save_dir: Union[None, str, Path] = None,
+                 save_data: bool = False,
                  save_video: bool = False,
                  ) -> None:
+        assert not ((save_data or save_video) and save_dir is None), 'Can\'t save data or videos without save_dir.'
         self.save_dir = save_dir
-        if save_dir is None:
-            self._env = env
-        else:
+        if save_dir is not None:
             Path(save_dir).mkdir(parents=True)
+        if save_data:
             self._env = CollectGymDataset(env, str(save_dir))
+        else:
+            self._env = env
         self._observation_dtypes = self._parse_dtype(env.observation_space)
         self._metrics = metrics or []
         self._save_video = save_video
