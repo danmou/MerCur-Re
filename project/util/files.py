@@ -26,8 +26,14 @@ def get_latest_checkpoint(checkpoint: Path, base_dir: Optional[Path] = None) -> 
             checkpoint = base_dir / checkpoint
         checkpoint = checkpoint.absolute()
         if not checkpoint.is_file():
-            # Get latest modified checkpoint file
-            checkpoint = max(checkpoint.glob('checkpoint*.h5'), key=lambda p: p.stat().st_mtime)
+            # Check if there is a 'checkpoint_latest' file
+            latest = checkpoint / 'checkpoint_latest'
+            if latest.is_file():
+                with open(latest) as f:
+                    checkpoint = checkpoint / f.read().strip()
+            else:
+                # Get latest modified checkpoint file
+                checkpoint = max(checkpoint.glob('checkpoint*.h5'), key=lambda p: p.stat().st_mtime)
         assert checkpoint.is_file()
     except (AssertionError, ValueError):
         raise ValueError(f'Checkpoint for {checkpoint} not found.')

@@ -39,10 +39,11 @@ class Main:
         self.base_logdir = Path(base_logdir)
         self.logdir = self._create_logdir(extension)
         init_logging(verbosity, self.logdir)
+        self._create_symlinks()
         if wandb.run.resumed:
+            logger.debug(f'Resumed run {wandb.run.id} ({wandb.run.name})')
             self._restore_wandb_checkpoint()
         else:
-            self._create_symlinks()
             self._update_wandb()
         if not tf.executing_eagerly():
             tf.compat.v1.enable_eager_execution()
@@ -66,12 +67,14 @@ class Main:
         except wandb.apis.CommError:
             wandb_name = None
         if wandb_name:
-            (Path(self.base_logdir) / wandb_name).symlink_to(link_dest)
+            wandb_symlink = Path(self.base_logdir) / wandb_name
+            while wandb_symlink.exists() or wandb_symlink.is_symlink():  # exists() is false for broken symlinks
+                wandb_symlink = Path(str(wandb_symlink) + '_cont')
+            wandb_symlink.symlink_to(link_dest)
             logger.info(f'W&B run name: {wandb_name}')
 
     def _update_wandb(self) -> None:
-        wandb.save(f'{self.logdir}/checkpoint')
-        wandb.save(f'{self.logdir}/*.ckpt*')
+        wandb.save(f'{self.logdir}/checkpoint_*')
         wandb.config.update({name.rsplit('.', 1)[-1]: conf
                              for (_, name), conf in gin.config._CONFIG.items()
                              if name is not None})
@@ -80,14 +83,16 @@ class Main:
     def _restore_wandb_checkpoint(self) -> None:
         restored_files = []
         try:
-            ckpt_file = yaml.safe_load(wandb.restore('checkpoint')).get('model_checkpoint_path')
-            restored_files.append('checkpoint')
+            latest_file = 'checkpoint_latest'
+            additional_data_file = 'checkpoint_additional_data.pickle'
+            with wandb.restore(latest_file) as f:
+                ckpt_file = f.read().strip()
+            restored_files.append(latest_file)
+            wandb.restore(additional_data_file)
+            restored_files.append(additional_data_file)
             assert ckpt_file, "Can't resume wandb run: no checkpoint found!"
-            ckpt_name = Path(ckpt_file).name
-            for ext in ['index', 'meta', 'data-00000-of-00001']:
-                name = f'{ckpt_name}.{ext}'
-                restored_files.append(name)
-                wandb.restore(name)
+            wandb.restore(ckpt_file)
+            restored_files.append(ckpt_file)
         finally:
             # Even if an error occurred, we don't want wandb to re-upload the downloaded files
             for file in restored_files:
@@ -109,8 +114,8 @@ class Main:
                 train(self.logdir, initial_data_path, checkpoint=self.checkpoint)
         finally:
             # Make sure all checkpoints get uploaded
-            wandb.save(f'{self.logdir}/checkpoint', policy='end')
-            wandb.save(f'{self.logdir}/*.ckpt*', policy='end')
+            wandb.save(f'{self.logdir}/checkpoint_*', policy='end')
+            wandb.log(commit=True)
 
     def evaluate(self,
                  num_episodes: int = 10,

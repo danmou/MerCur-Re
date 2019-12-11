@@ -191,12 +191,16 @@ class Model(auto_shape.Model):
 
     def save_weights(self, filepath: str, **kwargs: Any) -> None:
         super().save_weights(filepath, **kwargs)
-        additional_data_file = Path(filepath).parent / 'checkpoint_additional_data.pickle'
+        path = Path(filepath)
+        additional_data_file = path.parent / 'checkpoint_additional_data.pickle'
         additional_data = {'observation_components': self._observation_components,
                            'data_shapes': self._data_shapes,
                            'data_dtypes': self._data_dtypes}
         with open(additional_data_file, 'wb') as f:
             pickle.dump(additional_data, f, pickle.HIGHEST_PROTOCOL)
+        latest_checkpoint_file = path.parent / 'checkpoint_latest'
+        with open(latest_checkpoint_file, 'w') as f:
+            f.write(path.name)
 
 
 @measure_time
