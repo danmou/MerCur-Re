@@ -24,6 +24,8 @@ def with_global_options(func: Callable[..., None]) -> Callable[..., None]:
     @click.option('-d', '--debug', is_flag=True, help='Disable W&B syncing and enable debug config')
     @click.option('--gpus', default=None)
     @click.option('-m', '--model', help='Model checkpoint to load. Can be a dir or a specific file')
+    @click.option('--wandb-run', help='W&B run to evaluate or continue training from. Can be full id or part of name '
+                                      '(the latest matching run will be used)')
     @click.argument('extra_options', nargs=-1)
     def wrapper(config: Optional[str],
                 logdir: Optional[str],
@@ -76,17 +78,22 @@ def train_command(config: str,
                   debug: bool,
                   checkpoint: Optional[str],
                   extra_options: Tuple[str, ...],
+                  wandb_run: Optional[str],
                   initial_data: Optional[str],
                   ) -> None:
     """Run training."""
-    with main_configure(config, extra_options, verbosity, debug, checkpoint, data=data) as main:
+    with main_configure(config,
+                        extra_options,
+                        verbosity,
+                        debug,
+                        checkpoint,
+                        data=data,
+                        wandb_continue=wandb_run) as main:
         main.train(initial_data)
 
 
 @cli.command(name='evaluate')
 @with_global_options
-@click.option('--wandb-run', help='W&B run to evaluate. Can be full id or part of name '
-                                  '(the latest matching run will be used)')
 @click.option('-n', '--num-episodes', type=int, default=10, help='Number of episodes to evaluate on')
 @click.option('--no-video', is_flag=True, help='Disable video generation for faster evaluation')
 @click.option('--seed', type=int, help='Set seed for random values (this will also disable parallelization of loops)')
