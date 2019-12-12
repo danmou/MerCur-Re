@@ -114,7 +114,7 @@ class LoggingCallback(callbacks.Callback):
         self._steps = 0
 
     def on_train_batch_end(self, batch: int, logs: Dict[str, SupportsFloat] = None) -> None:
-        batch += 1  # Count batches from 1
+        log_batch = batch + 1  # Count batches from 1
         keys = list(logs.keys())
         if 'batch' in keys:
             keys.remove('batch')
@@ -127,15 +127,15 @@ class LoggingCallback(callbacks.Callback):
         self._batch_statistics.update(logs)
         if batch % self._batch_header_period == 0:
             self._batch_printer.print_header()
-        if batch % self._batch_log_period == 0:
+        if log_batch % self._batch_log_period == 0:
             row = self._batch_statistics.mean
-            row['batch'] = batch
+            row['batch'] = log_batch
             self._batch_printer.print_row(row)
             self._batch_statistics.reset()
         self._steps += 1
 
     def on_epoch_end(self, epoch: int, logs: Dict[str, SupportsFloat] = None) -> None:
-        epoch += 1  # Count epochs from 1
+        log_epoch = epoch + 1  # Count epochs from 1
         if self._epoch_printer is None:
             self._epoch_printer = PrettyPrinter(['epoch', 'phase'] + [k for k in logs.keys() if not k.startswith('val_')],
                                                 log_fn=logger.info)
@@ -144,14 +144,14 @@ class LoggingCallback(callbacks.Callback):
         self._epoch_statistics.update(logs)
         if epoch % self._epoch_header_period == 0:
             self._epoch_printer.print_header()
-        if epoch % self._epoch_log_period == 0:
+        if log_epoch % self._epoch_log_period == 0:
             row: Dict[str, Union[str, SupportsFloat]] = self._epoch_statistics.mean
-            row['epoch'] = epoch
+            row['epoch'] = log_epoch
             row['phase'] = 'train'
             self._epoch_printer.print_row(row)
             row = {k[4:]: v for k, v in row.items() if k.startswith('val_')}
             if row:
-                row['epoch'] = epoch
+                row['epoch'] = log_epoch
                 row['phase'] = 'val'
                 self._epoch_printer.print_row(row)
             self._epoch_statistics.reset()
@@ -161,10 +161,10 @@ class LoggingCallback(callbacks.Callback):
         epoch_time = current_time - self._prev_time
         wandb_row['epoch_time'] = epoch_time
         wandb_row['step_time'] = epoch_time / self._steps
-        wandb_row['steps'] = epoch * self._steps
+        wandb_row['steps'] = log_epoch * self._steps
         self._prev_time = current_time
         self._steps = 0
-        wandb.log(wandb_row, step=epoch - 1)
+        wandb.log(wandb_row, step=epoch)
 
 
 Episode = Optional[Dict[str, tf.Tensor]]
