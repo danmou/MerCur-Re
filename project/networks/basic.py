@@ -2,7 +2,7 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import Sequence
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -27,7 +27,7 @@ class ShapedDense(auto_shape.Sequential):
     def __init__(self,
                  shape: Sequence[int],
                  name: str = 'shaped_dense',
-                 **kwargs,
+                 **kwargs: Any,
                  ) -> None:
         units = np.prod(shape)
         super().__init__([auto_shape.Dense(units, **kwargs, name=f'{name}_dense'),

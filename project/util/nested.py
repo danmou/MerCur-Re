@@ -35,8 +35,8 @@ class FlatDataClass(Generic[FieldType]):
         if args:
             args = tf.nest.pack_sequence_as(self._structure, args)
             for arg, field in zip(args, dataclasses.fields(self)):
-                if field.default_factory is not dataclasses.MISSING:
-                    arg = field.default_factory(*arg)
+                if field.default_factory is not dataclasses.MISSING:  # type: ignore[misc]
+                    arg = field.default_factory(*arg)  # type: ignore[misc]
                 setattr(self, field.name, arg)
         elif kwargs:
             for field in dataclasses.fields(self):
@@ -46,8 +46,8 @@ class FlatDataClass(Generic[FieldType]):
     def _structure(self) -> List[Union[List, None]]:
         struct = []
         for field in dataclasses.fields(self):
-            if field.default_factory is not dataclasses.MISSING:
-                struct.append(field.default_factory()._structure)
+            if field.default_factory is not dataclasses.MISSING:  # type: ignore[misc]
+                struct.append(field.default_factory()._structure)  # type: ignore[misc]
             else:
                 struct.append(None)
         return struct

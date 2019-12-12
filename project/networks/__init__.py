@@ -8,4 +8,4 @@ from .decoder import Decoder
 from .encoder import Encoder
 from .wrappers import ExtraBatchDim, SelectItems
 
-__all__ = ['predictors', 'SequentialBlock', 'ShapedDense', 'Decoder', 'Encoder', 'ExtraBatchDim']
+__all__ = ['predictors', 'SequentialBlock', 'ShapedDense', 'Decoder', 'Encoder', 'ExtraBatchDim', 'SelectItems']

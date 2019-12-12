@@ -2,7 +2,6 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-import functools
 from typing import Any, Callable, Dict, List, Tuple, Type
 
 import gin
@@ -31,11 +30,11 @@ def habitat_task(action_repeat: int = 1,
     state_components = ['reward']
     observation_components = ['image', 'goal']
     metrics = ['success', 'spl', 'path_length', 'optimal_path_length', 'remaining_distance', 'collisions']
-    env_params = {'action_repeat': action_repeat,
-                  'max_duration': max_length,
-                  'capture_video': False}
+    env_params: Dict[str, Any] = {'action_repeat': action_repeat,
+                                  'max_duration': max_length,
+                                  'capture_video': False}
     env_params['wrappers'] = [(Wrapper, kwarg_fn(env_params)) for Wrapper, kwarg_fn in wrappers]
-    env_params.update(habitat.get_config(max_steps=max_length*action_repeat*3))  # times 3 because TURN_ANGLE is really 3 actions
+    env_params.update(habitat.get_config(max_steps=max_length * action_repeat * 3))  # times 3 because TURN_ANGLE is really 3 actions
 
     def env_ctor(**kwargs: Any) -> habitat.VectorHabitat:
         params = env_params.copy()

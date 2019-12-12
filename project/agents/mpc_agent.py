@@ -43,7 +43,7 @@ class MPCAgent(Agent):
     def state(self) -> List[tf.Variable]:
         return self._state
 
-    @state.setter
+    @state.setter  # type: ignore[misc]  # mypy/issues/1362
     @tf.function
     def state(self, value: List[tf.Tensor]) -> None:
         tf.nest.assert_same_structure(value, self._state)
@@ -53,7 +53,7 @@ class MPCAgent(Agent):
 
     @tf.function
     def reset(self) -> None:
-        self.state = list(tf.zeros_like(s) for s in self.state)
+        self.state = list(tf.zeros_like(s) for s in self.state)  # type: ignore[misc]  # mypy/issues/1362
 
     @tf.function
     def observe(self, observations: Observations, action: Optional[tf.Tensor]) -> None:
@@ -62,7 +62,7 @@ class MPCAgent(Agent):
         observations = tf.nest.map_structure(lambda t: t[tf.newaxis, tf.newaxis, :], observations)
         embedded = self._encoder(observations)[0]
         action = action[tf.newaxis, :]
-        _, self.state = self._predictor((embedded, action, tf.constant([[True]])), self.state)
+        _, self.state = self._predictor((embedded, action, tf.constant([[True]])), self.state)  # type: ignore[misc]  # mypy/issues/1362
 
     @tf.function
     def act(self) -> tf.Tensor:

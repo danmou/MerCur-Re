@@ -11,7 +11,7 @@ import tempfile
 from contextlib import contextmanager
 from ctypes.util import find_library
 from pathlib import Path
-from typing import Any, Dict, Generator, Optional, Union, cast
+from typing import Any, Dict, Generator, Mapping, Optional, Union, cast
 
 import gin
 import wandb
@@ -27,7 +27,7 @@ class InterceptHandler(logging.Handler):
     Handler to force stdlib logging to go through loguru
     Based on https://github.com/Delgan/loguru/issues/78
     """
-    def __init__(self, level: int = logging.NOTSET, module_levels: Optional[Dict[str, str]] = None):
+    def __init__(self, level: int = logging.NOTSET, module_levels: Optional[Mapping[str, str]] = None):
         super().__init__(level)
         self._module_levels = {} if module_levels is None else module_levels
         for mod, lev in self._module_levels.items():
@@ -112,4 +112,4 @@ def capture_output(name: str = 'output', level: str = 'TRACE') -> Generator[None
             temp_out.seek(0)
             record = {'name': name, 'function': '', 'line': ''}
             for line in temp_out.readlines():
-                logger.patch(lambda r: r.update(record)).log(level, line.rstrip())
+                logger.patch(lambda r: r.update(record)).log(level, line.rstrip())  # type: ignore[arg-type]

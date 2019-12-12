@@ -14,7 +14,6 @@ import gin.tf.external_configurables
 import tensorflow as tf
 import wandb
 import wandb.settings
-import yaml
 from loguru import logger
 from tensorflow.python.util import deprecation
 
@@ -160,8 +159,7 @@ def main_configure(config: str,
         f.write(open(config).read())
         f.write('\n# Extra options\n')
         f.write('\n'.join(extra_options))
-    if checkpoint is not None:
-        checkpoint = Path(checkpoint).absolute()
+    checkpoint_path = None if checkpoint is None else Path(checkpoint).absolute()
     tempdir = None
     try:
         if data:
@@ -173,7 +171,7 @@ def main_configure(config: str,
                    debug=debug,
                    catch_exceptions=catch_exceptions,
                    extension=extension,
-                   checkpoint=checkpoint)
+                   checkpoint=checkpoint_path)
     finally:
         if tempdir:
             tempdir.cleanup()

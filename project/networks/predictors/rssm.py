@@ -81,7 +81,7 @@ class SequentialNormalBlock(auto_shape.Layer):
         self._mean_layer = auto_shape.Dense(output_size, activation=None)
         self._stddev_layer = auto_shape.Dense(output_size, activation='softplus')
 
-    def call(self, inputs: tf.Tensor) -> List[tf.Tensor]:  # type: ignore[override]
+    def call(self, inputs: tf.Tensor) -> List[tf.Tensor]:
         hidden = self._hidden_layers(inputs)
         mean = self._mean_layer(hidden)
         stddev = self._stddev_layer(hidden)
@@ -139,8 +139,8 @@ class RSSM(Predictor):
                       output_size=state_size,
                       min_stddev=min_stddev,
                       mean_only=mean_only)
-        self._prior_dist = SequentialNormalBlock(**kwargs, name=f'{name}_prior_block')
-        self._posterior_dist = SequentialNormalBlock(**kwargs, name=f'{name}_posterior_block')
+        self._prior_dist = SequentialNormalBlock(**kwargs, name=f'{name}_prior_block')  # type: ignore[arg-type]
+        self._posterior_dist = SequentialNormalBlock(**kwargs, name=f'{name}_posterior_block')  # type: ignore[arg-type]
         super().__init__(name=name)
 
     def state_to_features(self, state: List[tf.Tensor]) -> tf.Tensor:
@@ -156,26 +156,25 @@ class RSSM(Predictor):
     def state_size(self) -> List[int]:
         return [self._state_size, self._state_size, self._state_size, self._belief_size]
 
-    def _transition(self, prev_state: List[tf.Tensor], prev_action: tf.Tensor) -> tf.Tensor:
+    def _transition(self, prev_state_unpacked: List[tf.Tensor], prev_action: tf.Tensor) -> tf.Tensor:
         """Compute next (deterministic) belief."""
-        prev_state = FullState(*prev_state)
+        prev_state = FullState(*prev_state_unpacked)
         hidden = tf.concat([prev_state.state.sample, prev_action], -1)
         hidden = self._input_layers(hidden)
         belief, _ = self._cell(hidden, [prev_state.belief])
         return belief
 
-    def _prior(self, prev_state: List[tf.Tensor], prev_action: tf.Tensor) -> List[tf.Tensor]:
+    def _prior(self, prev_state_unpacked: List[tf.Tensor], prev_action: tf.Tensor) -> List[tf.Tensor]:
         """Compute prior next state by applying the transition dynamics."""
-        belief = self._transition(prev_state, prev_action)
+        belief = self._transition(prev_state_unpacked, prev_action)
         prior_state = self._prior_dist(belief)
         prior = FullState(state=StateDist(*prior_state), belief=belief)
         return list(prior)
 
-    def _posterior(self, prev_state: List[tf.Tensor], prev_action: tf.Tensor, latent_obs: tf.Tensor) -> List[tf.Tensor]:
+    def _posterior(self, prev_state_unpacked: List[tf.Tensor], prev_action: tf.Tensor, latent_obs: tf.Tensor) -> List[tf.Tensor]:
         """Compute posterior state from previous state and current observation."""
-        belief = self._transition(prev_state, prev_action)
+        belief = self._transition(prev_state_unpacked, prev_action)
         hidden = tf.concat([belief, latent_obs], -1)
-        posterior_state = self._posterior_dist(hidden)
-        posterior = FullState(state=StateDist(*posterior_state), belief=belief)
+        posterior_state_unpacked = self._posterior_dist(hidden)
+        posterior = FullState(state=StateDist(*posterior_state_unpacked), belief=belief)
         return list(posterior)
-

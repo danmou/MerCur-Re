@@ -11,7 +11,9 @@ import gym.spaces
 import numpy as np
 from loguru import logger
 
-from .base import Action, Observations, ObsTuple, Wrapper
+from project.util.typing import Action, Observations, ObsTuple
+
+from .base import Wrapper
 
 
 class DiscreteWrapper(Wrapper):
@@ -34,7 +36,7 @@ class DiscreteWrapper(Wrapper):
             if np.sum(action) < 0.01:
                 action += 0.01
             assert np.sum(action) > 0, action
-            act = np.random.choice(len(action), p=action/np.sum(action))
+            act = np.random.choice(len(action), p=action / np.sum(action))
         else:
             act = np.argmax(action)
         return super().step(act)

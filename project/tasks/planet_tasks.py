@@ -29,7 +29,9 @@ def cartpole_balance(action_repeat: int = 8) -> Task:
     max_length = 1000 // action_repeat
     state_components = ['reward', 'position', 'velocity']
     observation_components = ['image']
-    env_ctor = lambda: _dm_control_env(action_repeat, max_length, 'cartpole', 'balance')
+
+    def env_ctor() -> gym.Env:
+        return _dm_control_env(action_repeat, max_length, 'cartpole', 'balance')
     return Task('cartpole_balance', env_ctor, max_length, state_components, observation_components, [])
 
 
@@ -38,7 +40,9 @@ def cartpole_swingup(action_repeat: int = 8) -> Task:
     max_length = 1000 // action_repeat
     state_components = ['reward', 'position', 'velocity']
     observation_components = ['image']
-    env_ctor = lambda: _dm_control_env(action_repeat, max_length, 'cartpole', 'swingup')
+
+    def env_ctor() -> gym.Env:
+        return _dm_control_env(action_repeat, max_length, 'cartpole', 'swingup')
     return Task('cartpole_swingup', env_ctor, max_length, state_components, observation_components, [])
 
 
@@ -47,7 +51,9 @@ def finger_spin(action_repeat: int = 2) -> Task:
     max_length = 1000 // action_repeat
     state_components = ['reward', 'position', 'velocity', 'touch']
     observation_components = ['image']
-    env_ctor = lambda: _dm_control_env(action_repeat, max_length, 'finger', 'spin')
+
+    def env_ctor() -> gym.Env:
+        return _dm_control_env(action_repeat, max_length, 'finger', 'spin')
     return Task('finger_spin', env_ctor, max_length, state_components, observation_components, [])
 
 
@@ -56,7 +62,9 @@ def cheetah_run(action_repeat: int = 4) -> Task:
     max_length = 1000 // action_repeat
     state_components = ['reward', 'position', 'velocity']
     observation_components = ['image']
-    env_ctor = lambda: _dm_control_env(action_repeat, max_length, 'cheetah', 'run')
+
+    def env_ctor() -> gym.Env:
+        return _dm_control_env(action_repeat, max_length, 'cheetah', 'run')
     return Task('cheetah_run', env_ctor, max_length, state_components, observation_components, [])
 
 
@@ -65,7 +73,9 @@ def cup_catch(action_repeat: int = 4) -> Task:
     max_length = 1000 // action_repeat
     state_components = ['reward', 'position', 'velocity']
     observation_components = ['image']
-    env_ctor = lambda: _dm_control_env(action_repeat, max_length, 'ball_in_cup', 'catch')
+
+    def env_ctor() -> gym.Env:
+        return _dm_control_env(action_repeat, max_length, 'ball_in_cup', 'catch')
     return Task('cup_catch', env_ctor, max_length, state_components, observation_components, [])
 
 
@@ -74,7 +84,9 @@ def walker_walk(action_repeat: int = 2) -> Task:
     max_length = 1000 // action_repeat
     state_components = ['reward', 'height', 'orientations', 'velocity']
     observation_components = ['image']
-    env_ctor = lambda: _dm_control_env(action_repeat, max_length, 'walker', 'walk')
+
+    def env_ctor() -> gym.Env:
+        return _dm_control_env(action_repeat, max_length, 'walker', 'walk')
     return Task('walker_walk', env_ctor, max_length, state_components, observation_components, [])
 
 
@@ -83,7 +95,9 @@ def reacher_easy(action_repeat: int = 4) -> Task:
     max_length = 1000 // action_repeat
     state_components = ['reward', 'position', 'velocity', 'to_target']
     observation_components = ['image']
-    env_ctor = lambda: _dm_control_env(action_repeat, max_length, 'reacher', 'easy')
+
+    def env_ctor() -> gym.Env:
+        return _dm_control_env(action_repeat, max_length, 'reacher', 'easy')
     return Task('reacher_easy', env_ctor, max_length, state_components, observation_components, [])
 
 
@@ -93,7 +107,9 @@ def gym_cheetah(action_repeat: int = 1) -> Task:
     max_length = 1000 // action_repeat
     state_components = ['reward', 'state']
     observation_components = ['image']
-    env_ctor = lambda: _gym_env(action_repeat, max_length, 'HalfCheetah-v3')
+
+    def env_ctor() -> gym.Env:
+        return _gym_env(action_repeat, max_length, 'HalfCheetah-v3')
     return Task('gym_cheetah', env_ctor, max_length, state_components, observation_components, [])
 
 
@@ -103,7 +119,9 @@ def gym_racecar(action_repeat: int = 1) -> Task:
     max_length = 1000 // action_repeat
     state_components = ['reward']
     observation_components = ['image']
-    env_ctor = lambda: _gym_env(action_repeat, max_length, 'CarRacing-v0', obs_is_image=True)
+
+    def env_ctor() -> gym.Env:
+        return _gym_env(action_repeat, max_length, 'CarRacing-v0', obs_is_image=True)
     return Task('gym_racing', env_ctor, max_length, state_components, observation_components, [])
 
 

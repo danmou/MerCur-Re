@@ -21,7 +21,7 @@ class Timer:
 @overload
 def measure_time(func: Callable = ..., *,
                  log_fn: Callable[[str], None] = ...,
-                 name: Optional[str] = ...
+                 name: Optional[str] = ...,
                  ) -> Callable:
     ...
 
@@ -29,12 +29,15 @@ def measure_time(func: Callable = ..., *,
 @overload
 def measure_time(func: None = ..., *,
                  log_fn: Callable[[str], None] = ...,
-                 name: Optional[str] = ...
+                 name: Optional[str] = ...,
                  ) -> Callable[[Callable], Callable]:
     ...
 
 
-def measure_time(func=None, *, log_fn=logger.debug, name=None):
+def measure_time(func: Optional[Callable] = None, *,
+                 log_fn: Callable[[str], None] = logger.debug,
+                 name: Optional[str] = None,
+                 ) -> Callable:
     def wrapper(fn: Callable) -> Callable:
         def timed(*args: Any, **kwargs: Any) -> Any:
             with Timer() as t:

@@ -15,11 +15,10 @@
 
 """Load tensors from a directory of numpy files."""
 
-from typing import Any, Dict, Generator, Iterable, Optional, Tuple, TypeVar
-
 import functools
 import os
 import random
+from typing import Any, Dict, Generator, Iterable, List, Optional, Tuple, TypeVar
 
 import gin
 import numpy as np
@@ -83,7 +82,7 @@ def cache_loader(directory: str,
                  action_noise: Optional[float] = None,
                  ) -> Generator[Episode, None, None]:
     """Loads all files into a cache, which is updated after `update_every` episodes"""
-    cache = {}
+    cache: Dict[str, Episode] = {}
     while True:
         episodes = _sample(cache.values(), update_every)
         for episode in _permuted(episodes, update_every):
@@ -99,10 +98,10 @@ def recent_loader(directory: str,
                   action_noise: Optional[float] = None,
                   ) -> Generator[Episode, None, None]:
     """Same as cache_loader, but 50% of the episodes come from the latest added set of files"""
-    recent = {}
-    cache = {}
+    recent: Dict[str, Episode] = {}
+    cache: Dict[str, Episode] = {}
     while True:
-        episodes = []
+        episodes: List[Episode] = []
         episodes += _sample(recent.values(), update_every // 2)
         episodes += _sample(cache.values(), update_every // 2)
         for episode in _permuted(episodes, update_every):

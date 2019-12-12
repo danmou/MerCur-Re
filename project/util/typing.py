@@ -2,7 +2,7 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import *
+from typing import Any, Dict, Mapping, Sequence, Tuple, TypeVar, Union
 
 import numpy as np
 

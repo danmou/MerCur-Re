@@ -2,7 +2,7 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import Any, Dict, Optional, Sequence, Union
+from typing import Any, Dict, Mapping, Optional, Sequence, Union
 
 import tensorflow as tf
 
@@ -30,7 +30,7 @@ class ExtraBatchDim(auto_shape.Wrapper):
     def _uncombine(self, tensor: tf.Tensor, batch_shape: tf.TensorShape) -> tf.Tensor:
         return tf.reshape(tensor, batch_shape + tensor.shape[1:])
 
-    def call(self, input: Union[tf.Tensor, Dict[str, tf.Tensor]], **kwargs: Any) -> Union[tf.Tensor, Dict[str, tf.Tensor]]:
+    def call(self, input: Union[tf.Tensor, Dict[str, tf.Tensor]], **kwargs: Any) -> tf.Tensor:
         input_flattened = tf.nest.flatten(input)
         batch_shape = input_flattened[0].shape[:2]
         assert all(i.shape[:2].as_list() == batch_shape.as_list() for i in input_flattened), \
@@ -46,12 +46,9 @@ class SelectItems(auto_shape.Wrapper):
         super().__init__(layer, **kwargs)
         self._select_keys = keys
 
-    def __call__(self, input: Dict[str, tf.Tensor], *args: Any, **kwargs: Any) -> Union[tf.Tensor, Dict[str, tf.Tensor]]:
+    def __call__(self, input: Mapping[str, tf.Tensor], *args: Any, **kwargs: Any) -> tf.Tensor:  # type: ignore[override]
         """We select keys here instead of in `call` so input shape gets correctly defined"""
         return super().__call__({k: input[k] for k in self._select_keys})
 
-    def call(self, input: Dict[str, tf.Tensor], *args: Any, **kwargs: Any) -> Union[tf.Tensor, Dict[str, tf.Tensor]]:
+    def call(self, input: Mapping[str, tf.Tensor], *args: Any, **kwargs: Any) -> tf.Tensor:
         return self.layer(input)
-
-    # def build_with_input(self, input: Dict[str, tf.Tensor], *args: Any, **kwargs: Any) -> None:
-    #     super().build_with_input(self._select_keys(input), *args, **kwargs)

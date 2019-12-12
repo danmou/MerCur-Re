@@ -2,7 +2,7 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import Dict, Iterable, Optional
+from typing import Iterable, Mapping, Optional
 
 import tensorflow as tf
 
@@ -28,6 +28,6 @@ class Encoder(auto_shape.Layer):
         ], name=f'{name}_sequential')
         self._concat = auto_shape.Concatenate(axis=-1)
 
-    def call(self, inputs: Dict[str, tf.Tensor]) -> tf.Tensor:  # type: ignore[override]
+    def call(self, inputs: Mapping[str, tf.Tensor]) -> tf.Tensor:
         vectors = [inputs[key] for key in self._vector_inputs]
         return self._concat([self._image_enc(inputs[self._image_input])] + vectors)

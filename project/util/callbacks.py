@@ -2,10 +2,10 @@
 #
 # (C) 2019, Daniel Mouritzen
 
+import time
 from functools import partial
 from pathlib import Path
-from typing import Any, Dict, List, Optional, SupportsFloat, Union, cast
-import time
+from typing import Any, Dict, List, Mapping, MutableMapping, Optional, SupportsFloat, Union, cast
 
 import gin
 import gym
@@ -16,14 +16,15 @@ from loguru import logger
 from tensorflow.keras import callbacks
 
 from project.agents import Agent
-from project.execution import Simulator, evaluate
 from project.environments.habitat import VectorHabitat
+from project.execution.evaluate import evaluate
+from project.execution.simulator import Simulator
 from project.model import Model
 from project.util import PrettyPrinter, Statistics
 from project.util.planet.numpy_episodes import episode_reader
-from project.util.planet.preprocess import preprocess, postprocess
-from project.util.timing import measure_time
+from project.util.planet.preprocess import postprocess, preprocess
 from project.util.summaries import prediction_trajectory_summary, video_summary
+from project.util.timing import measure_time
 
 
 @gin.configurable(whitelist=['period'])
@@ -39,8 +40,8 @@ class CheckpointCallback(callbacks.ModelCheckpoint):
 class DataCollectionCallback(callbacks.Callback):
     """Collects new data between epochs using current model"""
     def __init__(self,
-                 sims: Dict[str, Dict[str, Simulator]],
-                 agents: Dict[str, Agent],
+                 sims: Mapping[str, Mapping[str, Simulator]],
+                 agents: Mapping[str, Agent],
                  period: int = 1,
                  train_episodes: int = 1,
                  test_episodes: int = 1,
@@ -68,7 +69,7 @@ class EvaluateCallback(callbacks.Callback):
     def __init__(self,
                  logdir: Path,
                  model: Model,
-                 envs: Dict[str, gym.Env],
+                 envs: Mapping[str, gym.Env],
                  period: int = 10,
                  num_episodes: int = 10,
                  ) -> None:
@@ -113,7 +114,9 @@ class LoggingCallback(callbacks.Callback):
         self._prev_time = time.time()
         self._steps = 0
 
-    def on_train_batch_end(self, batch: int, logs: Dict[str, SupportsFloat] = None) -> None:
+    def on_train_batch_end(self, batch: int, logs: Optional[Mapping[str, SupportsFloat]] = None) -> None:
+        if logs is None:
+            return
         log_batch = batch + 1  # Count batches from 1
         keys = list(logs.keys())
         if 'batch' in keys:
@@ -134,7 +137,9 @@ class LoggingCallback(callbacks.Callback):
             self._batch_statistics.reset()
         self._steps += 1
 
-    def on_epoch_end(self, epoch: int, logs: Dict[str, SupportsFloat] = None) -> None:
+    def on_epoch_end(self, epoch: int, logs: Optional[Mapping[str, SupportsFloat]] = None) -> None:
+        if logs is None:
+            return
         log_epoch = epoch + 1  # Count epochs from 1
         if self._epoch_printer is None:
             self._epoch_printer = PrettyPrinter(['epoch', 'phase'] + [k for k in logs.keys() if not k.startswith('val_')],
@@ -145,7 +150,7 @@ class LoggingCallback(callbacks.Callback):
         if epoch % self._epoch_header_period == 0:
             self._epoch_printer.print_header()
         if log_epoch % self._epoch_log_period == 0:
-            row: Dict[str, Union[str, SupportsFloat]] = self._epoch_statistics.mean
+            row: MutableMapping[str, Union[str, SupportsFloat]] = self._epoch_statistics.mean  # type: ignore[assignment]  # mypy/issues/8136
             row['epoch'] = log_epoch
             row['phase'] = 'train'
             self._epoch_printer.print_row(row)
@@ -167,13 +172,13 @@ class LoggingCallback(callbacks.Callback):
         wandb.log(wandb_row, step=epoch)
 
 
-Episode = Optional[Dict[str, tf.Tensor]]
+Episode = Dict[str, tf.Tensor]
 
 
 @gin.configurable(whitelist=['period', 'batch_episodes'])
 class PredictionSummariesCallback(callbacks.Callback):
     """Summaries visualizing the output of the model"""
-    def __init__(self, model: Model, dirs: Dict[str, Path], period: int = 10, batch_episodes: int = 5) -> None:
+    def __init__(self, model: Model, dirs: Mapping[str, Path], period: int = 10, batch_episodes: int = 5) -> None:
         super().__init__()
         self._model = model
         self._period = period
@@ -181,9 +186,9 @@ class PredictionSummariesCallback(callbacks.Callback):
         self._episode_getters = {f'{phase}/{"no_"*(not success)}success': partial(self._get_episodes, directory, success)
                                  for success in [False, True]
                                  for phase, directory in dirs.items()}
-        self._episodes: Dict[str, Episode] = {k: None for k in self._episode_getters.keys()}
+        self._episodes: Dict[str, Optional[Episode]] = {k: None for k in self._episode_getters.keys()}
 
-    def _get_episodes(self, directory: Path, success: Optional[bool] = None) -> Episode:
+    def _get_episodes(self, directory: Path, success: Optional[bool] = None) -> Optional[Episode]:
         episodes = []
         for episode_file in sorted(directory.glob('*.npz')):
             episode = episode_reader(str(episode_file))
@@ -207,7 +212,7 @@ class PredictionSummariesCallback(callbacks.Callback):
         if amount > 0:
             for key, value in episode.items():
                 if key != 'length':
-                    padding = tf.tile(value[tf.newaxis, -1], [amount] + [1]*(value.shape.ndims - 1))
+                    padding = tf.tile(value[tf.newaxis, -1], [amount] + [1] * (value.shape.ndims - 1))
                     output[key] = tf.concat([value, padding], 0)
             output['length'] = length
         return output
@@ -242,10 +247,11 @@ class PredictionSummariesCallback(callbacks.Callback):
             summaries[f'{base_name}/{key}_trajectory'] = prediction_trajectory_summary(target, prediction, key)
         return summaries
 
-    def on_epoch_end(self, epoch: int, logs: Dict[str, SupportsFloat] = None) -> None:
+    def on_epoch_end(self, epoch: int, logs: Mapping[str, SupportsFloat] = None) -> None:
         if (epoch + 1) % self._period == 0:
             plt.close('all')
             for name in self._episodes.keys():
-                if self._episodes[name] is None or self._episodes[name]['reward'].shape[0] < self._batch_episodes:
+                episode = self._episodes[name]
+                if episode is None or episode['reward'].shape[0] < self._batch_episodes:
                     self._episodes[name] = self._episode_getters[name]()
                 wandb.log(self._make_summaries(name), step=epoch)

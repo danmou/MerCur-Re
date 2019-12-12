@@ -3,7 +3,7 @@
 # (C) 2019, Daniel Mouritzen
 
 from pathlib import Path
-from typing import Any, Dict, Iterable, SupportsFloat, Union
+from typing import Any, Collection, Dict, Mapping, SupportsFloat, Union
 
 import numpy as np
 
@@ -16,7 +16,7 @@ class Statistics:
     _means: np.ndarray
     _mean_squares: np.ndarray
 
-    def __init__(self, keys: Iterable[str], save_file: Union[str, Path, None] = None) -> None:
+    def __init__(self, keys: Collection[str], save_file: Union[str, Path, None] = None) -> None:
         self._keys = keys
         self._file = save_file and open(save_file, 'w')
         if self._file:
@@ -28,13 +28,13 @@ class Statistics:
         self._means = np.zeros([len(self._keys)])
         self._mean_squares = np.zeros([len(self._keys)])
 
-    def _from_dict(self, data: Dict[str, SupportsFloat]) -> np.ndarray:
+    def _from_dict(self, data: Mapping[str, SupportsFloat]) -> np.ndarray:
         return np.array([float(data[k]) for k in self._keys])
 
     def _to_dict(self, data: np.ndarray) -> Dict[str, float]:
         return dict(zip(self._keys, data.tolist()))
 
-    def update(self, data_dict: Dict[str, SupportsFloat]) -> None:
+    def update(self, data_dict: Mapping[str, SupportsFloat]) -> None:
         data = self._from_dict(data_dict)
         if self._file:
             self._file.write(','.join(str(d) for d in data) + '\n')

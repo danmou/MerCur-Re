@@ -14,11 +14,10 @@ from loguru import logger
 from project.agents import Agent
 from project.environments.wrappers import CollectGymDataset
 from project.util import PrettyPrinter, Statistics
+from project.util.planet.preprocess import preprocess
 from project.util.tf import tf_nested_py_func
 from project.util.timing import Timer
 from project.util.typing import Observations, ObsTuple
-from project.util.planet.preprocess import preprocess
-
 
 TensorObs = Union[tf.Tensor, Dict[str, tf.Tensor]]
 TensorObsTuple = Tuple[TensorObs, tf.Tensor, tf.Tensor, Dict[str, tf.Tensor]]
@@ -34,15 +33,15 @@ class Simulator:
                  save_video: bool = False,
                  ) -> None:
         assert not ((save_data or save_video) and save_dir is None), 'Can\'t save data or videos without save_dir.'
-        self.save_dir = save_dir
-        if save_dir is not None:
-            Path(save_dir).mkdir(parents=True)
+        self.save_dir = None if save_dir is None else Path(save_dir)
+        if self.save_dir is not None:
+            self.save_dir.mkdir(parents=True)
         if save_data:
-            self._env = CollectGymDataset(env, str(save_dir))
+            self._env = CollectGymDataset(env, str(self.save_dir))
         else:
             self._env = env
         self._observation_dtypes = self._parse_dtype(env.observation_space)
-        self._metrics = metrics or []
+        self._metrics = list(metrics) if metrics else []
         self._save_video = save_video
 
     @property
@@ -70,6 +69,7 @@ class Simulator:
             statistics.update(dict(steps=steps, score=score, **metrics))
             pp.print_row(dict(episode=episode, steps=steps, score=score, **metrics))
             if self._save_video:
+                assert self.save_dir is not None
                 self._env.save_video(self.save_dir / f'episode_{episode}_spl_{metrics["spl"]:.2f}')
         log_fn('Results:')
         statistics.print(log_fn=log_fn)
@@ -87,7 +87,7 @@ class Simulator:
         score = tf.constant(0.0, tf.float32)
         steps = tf.constant(0, tf.int16)
         plan_time = tf.constant(0.0, tf.float32)
-        metrics = {}
+        metrics: Dict[str, tf.Tensor] = {}
 
         agent.reset()
         obs = self._tf_reset_env()
@@ -136,7 +136,7 @@ class Simulator:
         return self._tf_process_obs(obs), reward, done, metrics
 
     @staticmethod
-    def _parse_dtype(space: gym.Space):
+    def _parse_dtype(space: gym.Space) -> Union[tf.DType, Dict[str, Union[tf.DType, Dict]]]:
         """Get tensor dtypes from a gym space."""
         if isinstance(space, gym.spaces.Discrete):
             return tf.int32

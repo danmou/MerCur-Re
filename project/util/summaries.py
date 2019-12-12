@@ -2,7 +2,7 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import List, Optional
+from typing import List, Optional, Sequence, Union
 
 import gin
 import matplotlib.pyplot as plt
@@ -21,7 +21,7 @@ def video_summary(targets: tf.Tensor, predictions: tf.Tensor, max_batch: int = 5
     frames = tf.transpose(frames, [0, 3, 1, 2])  # wandb assumes order [time, channels, height, width]
     frames = tf.cast(frames * 255, tf.uint8)
     # Add 5 black frames to indicate beginning
-    frames = tf.concat([tf.zeros_like(frames[:1])]*5 + [frames], 0)
+    frames = tf.concat([tf.zeros_like(frames[:1])] * 5 + [frames], 0)
     return wandb.Video(frames, fps=fps, format="mp4")
 
 
@@ -31,6 +31,8 @@ def prediction_trajectory_summary(target: tf.Tensor, prediction: Optional[tf.Ten
     if target.shape.ndims == 1:
         target = target[:, tf.newaxis]
     target = tf.unstack(tf.transpose(target, (1, 0)))
+    lines: Sequence[Union[tf.Tensor, Sequence[tf.Tensor]]]
+    labels: Sequence[Sequence[Optional[str]]]
     if prediction is not None:
         if prediction.shape.ndims == 1:
             prediction = prediction[:, tf.newaxis]
@@ -39,14 +41,14 @@ def prediction_trajectory_summary(target: tf.Tensor, prediction: Optional[tf.Ten
         labels = [['Prediction', 'Truth']] * len(lines)
     else:
         lines = [target]
-        labels = [list(range(len(target))) if len(target) > 1 else [None]]
+        labels = [list(map(str, range(len(target)))) if len(target) > 1 else [None]]
     titles = [f'{name} {i}' for i in range(len(lines))] if len(lines) > 1 else [name]
     return plot_summary(titles, lines, labels)
 
 
 def plot_summary(titles: List[str],
-                 lines: List[List[tf.Tensor]],
-                 labels: List[List[Optional[str]]],
+                 lines: Sequence[Union[tf.Tensor, Sequence[tf.Tensor]]],
+                 labels: Sequence[Sequence[Optional[str]]],
                  grid: bool = True,
                  ) -> plt.Figure:
     """

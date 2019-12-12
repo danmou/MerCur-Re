@@ -17,7 +17,7 @@ import datetime
 import io
 import os
 import uuid
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, Union
 
 import gin
 import gym
@@ -27,7 +27,9 @@ import skimage.transform
 import tensorflow as tf
 from loguru import logger
 
-from .base import Action, Observations, ObsTuple, Reward, Wrapper
+from project.util.typing import Action, Observations, ObsTuple, Reward
+
+from .base import Wrapper
 
 
 class ObservationDict(Wrapper):

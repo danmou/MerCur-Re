@@ -7,7 +7,7 @@ from __future__ import annotations
 import random
 from pathlib import Path
 from shutil import copyfile
-from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union, cast
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, TypeVar, Union, cast
 from unittest.mock import MagicMock
 
 import gin
@@ -56,8 +56,7 @@ class Success(habitat.Measure):
         current_position = self._sim.get_agent_state().position.tolist()
         distance_to_target = self._sim.geodesic_distance(current_position, episode.goals[0].position)
 
-        self._metric = int(getattr(task, 'is_stop_called', False) and
-                           distance_to_target < self._config.SUCCESS_DISTANCE)
+        self._metric = int(getattr(task, 'is_stop_called', False) and distance_to_target < self._config.SUCCESS_DISTANCE)
 
 
 @habitat_sim.registry.register_move_fn(body_action=True)
@@ -79,7 +78,7 @@ class TurnAngleAction(SimulatorTaskAction):
     def _get_uuid(self, *args: Any, **kwargs: Any) -> str:
         return 'turn_angle'
 
-    def step(self, *args: Any, **kwargs: Any) -> Observations:  # type: ignore[override]
+    def step(self, *args: Any, **kwargs: Any) -> Observations:
         return self._sim.step(HabitatSimActions.TURN_ANGLE)
 
 
@@ -220,7 +219,7 @@ class Habitat(habitat.RLEnv):
                 end = img_size * (1 - act) / 2
                 left = round(min(start, end))
                 right = round(max(start, end))
-                new_obs['rgb'][round(img_size*0.9):round(img_size*0.95),
+                new_obs['rgb'][round(img_size * 0.9):round(img_size * 0.95),
                                round(left):round(right)] = np.array([0, 0, 255])
 
             self._rgb_frames.append(observations_to_image(new_obs, self.habitat_env.get_metrics()))
@@ -318,7 +317,7 @@ class DummyHabitat(gym.Env):
 class VectorHabitat(VectorEnv):
     def __init__(self,
                  env_ctor: Callable[..., gym.Env],
-                 params: Dict[str, Any],
+                 params: Mapping[str, Any],
                  auto_reset_done: bool = False) -> None:
         super().__init__(env_ctor, [tuple(params.items())], auto_reset_done=auto_reset_done, multiprocessing_start_method='fork')
         self.observation_space = self.observation_spaces[0]

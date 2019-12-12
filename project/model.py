@@ -5,7 +5,7 @@
 import pickle
 import re
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, cast
 
 import gin
 import tensorflow as tf
@@ -24,8 +24,8 @@ class Model(auto_shape.Model):
     """This class defines the top-level model structure and losses"""
     def __init__(self,
                  observation_components: Iterable[str],
-                 data_shapes: Dict[str, tf.TensorShape],
-                 data_dtypes: Dict[str, tf.DType],
+                 data_shapes: Mapping[str, tf.TensorShape],
+                 data_dtypes: Mapping[str, tf.DType],
                  predictor: networks.predictors.Predictor = gin.REQUIRED,
                  disable_tf_optimization: bool = False,
                  ) -> None:
@@ -78,7 +78,7 @@ class Model(auto_shape.Model):
                                       name=name)
 
     @staticmethod
-    def _get_mask(data: Dict[str, tf.Tensor]) -> tf.Tensor:
+    def _get_mask(data: Mapping[str, tf.Tensor]) -> tf.Tensor:
         return tf.sequence_mask(data['length'], tf.shape(data['reward'])[1])
 
     @property
@@ -91,14 +91,14 @@ class Model(auto_shape.Model):
         data['length'] = tf.constant([2, 2], self._data_dtypes['length'])
         return data
 
-    def closed_loop(self, data: Dict[str, tf.Tensor]) -> Tuple[List[tf.Tensor], List[tf.Tensor]]:
+    def closed_loop(self, data: Mapping[str, tf.Tensor]) -> Tuple[List[tf.Tensor], List[tf.Tensor]]:
         embedded = self.encoder(data)
         use_obs = tf.ones(tf.shape(embedded[:, :, :1])[:3], tf.bool)
         prior, posterior = self.rnn((embedded, data['action'], use_obs), mask=self._get_mask(data))
         return prior, posterior
 
     @gin.configurable(whitelist=['context'])
-    def open_loop(self, data: Dict[str, tf.Tensor], context: int = 5) -> List[tf.Tensor]:
+    def open_loop(self, data: Mapping[str, tf.Tensor], context: int = 5) -> List[tf.Tensor]:
         embedded = self.encoder(data)
         mask = self._get_mask(data)
         context = min(mask.shape[1] - 1, context)
@@ -110,7 +110,7 @@ class Model(auto_shape.Model):
         open_prior, _ = self.rnn((tf.zeros_like(embedded[:, context:]), data['action'][:, context:], use_obs),
                                  initial_state=last_posterior,
                                  mask=mask[:, context:])
-        return tf.nest.map_structure(lambda x, y: tf.concat([x, y], 1), closed_posterior, open_prior)
+        return cast(List[tf.Tensor], tf.nest.map_structure(lambda x, y: tf.concat([x, y], 1), closed_posterior, open_prior))
 
     def decode(self, state_features: tf.Tensor) -> Dict[str, tf.Tensor]:
         reconstructions = {}
@@ -118,14 +118,8 @@ class Model(auto_shape.Model):
             reconstructions[name] = decoder(state_features)
         return reconstructions
 
-    # def __call__(self, inputs: Dict[str, tf.Tensor]) -> Tuple[List[tf.Tensor],
-    #                                                       List[tf.Tensor],
-    #                                                       List[tf.Tensor],
-    #                                                       Dict[str, tf.Tensor]]:  # type: ignore[override]
-    #     return super().__call__(inputs)
-
-    def call(self, inputs: Dict[str, tf.Tensor]) -> tf.Tensor:  # type: ignore[override]
-        inputs = inputs.copy()  # Shallow copy input dict so we can modify it safely
+    def call(self, inputs: Mapping[str, tf.Tensor]) -> tf.Tensor:
+        inputs = dict(inputs)  # Shallow copy input dict so we can modify it safely
         if self._batch_size and tf.nest.flatten(inputs)[0].shape[0] is None:
             # Workaround for keras making the batch dimension undefined
             tf.nest.map_structure(lambda x: x.set_shape([self._batch_size] + x.shape[1:]), inputs)
@@ -164,8 +158,8 @@ class Model(auto_shape.Model):
 
     @tf.function(experimental_relax_shapes=True)
     def reconstruction_log_probs(self,
-                                 targets: Dict[str, tf.Tensor],
-                                 reconstructions: Dict[str, tf.Tensor],
+                                 targets: Mapping[str, tf.Tensor],
+                                 reconstructions: Mapping[str, tf.Tensor],
                                  mask: Optional[tf.Tensor] = None,
                                  ) -> Dict[str, tf.Tensor]:
         log_probs = {}
@@ -180,7 +174,10 @@ class Model(auto_shape.Model):
         return log_probs
 
     @gin.configurable(whitelist=['scales'])
-    def combine_losses(self, all_losses: Dict[str, tf.Tensor], scales: Dict[str, float] = gin.REQUIRED) -> tf.Tensor:
+    def combine_losses(self,
+                       all_losses: Mapping[str, tf.Tensor],
+                       scales: Mapping[str, float] = gin.REQUIRED,
+                       ) -> tf.Tensor:
         total = 0.0
         for name, loss in all_losses.items():
             scale = scales.get(name, 0.0)
@@ -196,18 +193,18 @@ class Model(auto_shape.Model):
         additional_data = {'observation_components': self._observation_components,
                            'data_shapes': self._data_shapes,
                            'data_dtypes': self._data_dtypes}
-        with open(additional_data_file, 'wb') as f:
-            pickle.dump(additional_data, f, pickle.HIGHEST_PROTOCOL)
+        with open(additional_data_file, 'wb') as f1:
+            pickle.dump(additional_data, f1, pickle.HIGHEST_PROTOCOL)
         latest_checkpoint_file = path.parent / 'checkpoint_latest'
-        with open(latest_checkpoint_file, 'w') as f:
-            f.write(path.name)
+        with open(latest_checkpoint_file, 'w') as f2:
+            f2.write(path.name)
 
 
 @measure_time
 @gin.configurable(whitelist=['optimizer'])
 def get_model(observation_components: Iterable[str],
-              data_shapes: Dict[str, tf.TensorShape],
-              data_dtypes: Dict[str, tf.DType],
+              data_shapes: Mapping[str, tf.TensorShape],
+              data_dtypes: Mapping[str, tf.DType],
               optimizer: tf.keras.optimizers.Optimizer,
               ) -> Model:
     """Returns a built model with random weights"""

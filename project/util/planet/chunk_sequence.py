@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Optional
+from typing import Dict, Optional, cast
 
 import tensorflow as tf
 
@@ -32,7 +32,7 @@ def chunk_sequence(sequence: Dict[str, tf.Tensor],
     the true length)
 
     Args:
-      sequence: Nested dict of tensors with time dimension.
+      sequence: Dict of tensors with time dimension.
       chunk_length: Size of chunks the sequence will be split into.
       randomize: Start chunking from a random offset in the sequence,
           enforcing that at least one chunk is generated.
@@ -40,9 +40,10 @@ def chunk_sequence(sequence: Dict[str, tf.Tensor],
           from the sequence. Requires input to be long enough.
 
     Returns:
-      Nested dict of sequence tensors with chunk dimension.
+      Dict of sequence tensors with chunk dimension.
     """
     with tf.device('/cpu:0'):
+        length: int
         if 'length' in sequence:
             length = sequence.pop('length')
         else:
@@ -56,7 +57,7 @@ def chunk_sequence(sequence: Dict[str, tf.Tensor],
 
         if randomize:
             if num_chunks is None:
-                num_chunks = tf.maximum(1, length // chunk_length - 1)
+                num_chunks = cast(int, tf.maximum(1, length // chunk_length - 1))
             else:
                 num_chunks = num_chunks + 0 * length
             used_length = num_chunks * chunk_length
@@ -70,7 +71,7 @@ def chunk_sequence(sequence: Dict[str, tf.Tensor],
             used_length = num_chunks * chunk_length
             offset = 0
         clipped = tf.nest.map_structure(lambda tensor: tensor[offset: offset + used_length], sequence)
-        chunks = tf.nest.map_structure(
+        chunks: Dict[str, tf.Tensor] = tf.nest.map_structure(
             lambda tensor: tf.reshape(tensor, [num_chunks, chunk_length] + tensor.shape[1:].as_list()),
             clipped)
         chunks['length'] = tf.minimum(chunk_length, length) * tf.ones((num_chunks,), dtype=tf.int32)

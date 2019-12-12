@@ -8,7 +8,7 @@ import random
 import string
 import time
 from multiprocessing import Process
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Mapping, Optional, cast
 
 import click
 import wandb
@@ -55,7 +55,7 @@ class Config:
             return True
         return False
 
-    def check_params(self, params: Dict[str, Any]) -> bool:
+    def check_params(self, params: Mapping[str, Any]) -> bool:
         assert self.dict is not None
         for condition in self.dict.get('conditions', []):
             if not eval(condition, {}, {name.split('.')[-1]: val['value'] for name, val in params.items()}):
@@ -139,7 +139,7 @@ class SweepController:
         scheduled = self.tuner._scheduler.get('scheduled') or []
         return latest in {p['id'] for p in scheduled}
 
-    def schedule(self, params: Dict[str, Any]) -> None:
+    def schedule(self, params: Mapping[str, Any]) -> None:
         schedule_list = self.get_running()
         schedule_id = ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(8))
         schedule_list.append({'id': schedule_id, 'data': {'args': params}})

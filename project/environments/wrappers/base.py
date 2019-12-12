@@ -2,12 +2,11 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import Any, Dict, Tuple, Union, cast
+from typing import Any, cast
 
 import gym
-import numpy as np
 
-from project.util.typing import Action, Observations, ObsTuple, Reward
+from project.util.typing import Action, Observations, ObsTuple
 
 
 class Wrapper(gym.Wrapper):

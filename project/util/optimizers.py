@@ -3,7 +3,7 @@
 # (C) 2019, Daniel Mouritzen
 
 from types import MethodType
-from typing import Any, Callable, Iterable, List, NoReturn, Optional, Tuple
+from typing import Callable, Iterable, List, NoReturn, Optional, Tuple, cast
 
 import gin
 import tensorflow as tf
@@ -15,12 +15,13 @@ def with_global_norm_clipping(optimizer: optimizers.Optimizer = gin.REQUIRED,
                               clip_norm: Optional[float] = gin.REQUIRED) -> optimizers.Optimizer:
     original_compute_gradients = optimizer._compute_gradients
 
-    def _compute_gradients(self,
+    def _compute_gradients(self: optimizers.Optimizer,
                            loss: Callable[[], tf.Tensor],
                            var_list: Iterable[tf.Variable],
                            grad_loss: Optional[tf.Tensor] = None
                            ) -> List[Tuple[Optional[tf.Tensor], tf.Variable]]:
-        grads_and_vars = original_compute_gradients(loss, var_list, grad_loss)
+        grads_and_vars = cast(List[Tuple[Optional[tf.Tensor], tf.Variable]],
+                              original_compute_gradients(loss, var_list, grad_loss))
         print('clipping')
         if clip_norm is None:
             return grads_and_vars
@@ -28,7 +29,7 @@ def with_global_norm_clipping(optimizer: optimizers.Optimizer = gin.REQUIRED,
         grads = tf.clip_by_global_norm(grads, clip_norm)
         return list(zip(grads, var_list))
 
-    def get_config(self) -> NoReturn:
+    def get_config(self: optimizers.Optimizer) -> NoReturn:
         raise NotImplementedError
 
     optimizer._compute_gradients = MethodType(_compute_gradients, optimizer)

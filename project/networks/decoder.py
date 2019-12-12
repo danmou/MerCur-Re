@@ -21,6 +21,6 @@ class Decoder(auto_shape.Layer):
             auto_shape.Conv2DTranspose(filters=3, kernel_size=6, strides=2, activation=None, name=f'{name}_conv_t_3'),
         ], name=name)
 
-    def call(self, input: tf.Tensor) -> tf.Tensor:  # type: ignore[override]
+    def call(self, input: tf.Tensor) -> tf.Tensor:
         assert input.shape.ndims == 2
         return self._decoder(input)

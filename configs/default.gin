@@ -43,7 +43,6 @@ Model.decoders.num_units = 100  # used for reward and goal prediction
 training.batch_shape = (64, 64)  # [batch_size, time_batch]
 
 # Optimizer
-# training.optimizer = @tf.keras.optimizers.Adam()
 get_model.optimizer = @optimizers.with_global_norm_clipping()
 optimizers.with_global_norm_clipping.clip_norm = 1000.0
 optimizers.with_global_norm_clipping.optimizer = @tf.keras.optimizers.Adam()

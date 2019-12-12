@@ -57,9 +57,10 @@ def evaluate(logdir: Path,
         original_config, original_params = reconfigure_env(env, video, seed)
     env = wrap_env(env, task)
 
+    save_dir = logdir / 'eval' / f'{datetime.now():%Y%m%d-%H%M%S}'
     sim = Simulator(env,
                     metrics=task.metrics,
-                    save_dir=logdir / 'eval' / f'{datetime.now():%Y%m%d-%H%M%S}',
+                    save_dir=save_dir,
                     save_video=video)
 
     if not tf.distribute.has_strategy():
@@ -68,11 +69,12 @@ def evaluate(logdir: Path,
         distribute_scope = contextlib.nullcontext()
     with distribute_scope:
         if model is None:
+            assert checkpoint is not None
             model, _ = restore_model(checkpoint, logdir)
         agent = MPCAgent(env.action_space, model, objective='reward')
         mean_metrics = sim.run(agent, num_episodes, log=True)
 
-    videos = [wandb.Video(str(vid), fps=10, format="mp4") for vid in sim.save_dir.glob('*.mp4')] if video else None
+    videos = [wandb.Video(str(vid), fps=10, format="mp4") for vid in save_dir.glob('*.mp4')] if video else None
 
     if sync_wandb:
         # First delete existing summary items
@@ -80,7 +82,7 @@ def evaluate(logdir: Path,
             wandb.run.summary._root_del((k,))
         wandb.run.summary.update(mean_metrics)
         wandb.run.summary['seed'] = seed
-        if video:
+        if videos:
             for i, vid in enumerate(videos):
                 wandb.run.summary[f'video_{i}'] = vid
 

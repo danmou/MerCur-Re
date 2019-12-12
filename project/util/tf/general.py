@@ -17,7 +17,7 @@ def tf_nested_py_func(func: Callable,
                       out_types: Nested[tf.DType],
                       ) -> Nested[tf.Tensor]:
     """tf.numpy_function replacement that allows nested structures"""
-    def flat_func(*flattened: Any) -> None:
+    def flat_func(*flattened: Any) -> Any:
         nested = tf.nest.pack_sequence_as(inp, flattened)
         nested_output = func(*nested)
         tf.nest.assert_same_structure(nested_output, out_types)

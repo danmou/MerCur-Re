@@ -2,7 +2,7 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import Callable, Dict, Iterable, SupportsFloat, Union
+from typing import Callable, Iterable, Mapping, SupportsFloat, Union
 
 from loguru import logger
 
@@ -23,7 +23,7 @@ class PrettyPrinter:
     def print_header(self) -> None:
         self.log_fn(self.separator.join(self.header.values()))
 
-    def print_row(self, row: Dict[str, Union[str, SupportsFloat]]) -> None:
+    def print_row(self, row: Mapping[str, Union[str, SupportsFloat]]) -> None:
         row_values = [row[k] for k in self.header.keys()]
         row_strings = [self.format_number(v, l) for v, l in zip(row_values, self.widths)]
         self.log_fn(self.separator.join(row_strings))
