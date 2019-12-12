@@ -2,6 +2,7 @@
 #
 # (C) 2019, Daniel Mouritzen
 
+import os.path
 from pathlib import Path
 from typing import Optional
 
@@ -10,7 +11,7 @@ def link_directory_contents(source: Path, dest: Path) -> None:
     dest.mkdir(parents=True, exist_ok=True)
     for src_file in source.iterdir():
         dest_file = dest / src_file.name
-        dest_file.symlink_to(src_file)
+        dest_file.symlink_to(os.path.relpath(src_file, dest))
 
 
 def get_latest_checkpoint(checkpoint: Path, base_dir: Optional[Path] = None) -> Path:

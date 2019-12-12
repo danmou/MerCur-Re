@@ -56,7 +56,7 @@ def train(logdir: Path,
     if initial_data:
         logger.info('Linking initial dataset.')
         for dataset in dataset_dirs.values():
-            link_directory_contents(Path(initial_data).absolute().relative_to(dataset) / dataset.name, dataset)
+            link_directory_contents(Path(initial_data).absolute() / dataset.name, dataset)
     else:
         for task, task_sims in sims.items():
             for phase, sim in task_sims.items():
