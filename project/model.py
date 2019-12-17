@@ -24,16 +24,14 @@ class Model(auto_shape.Model):
     """This class defines the top-level model structure and losses"""
     def __init__(self,
                  observation_components: Iterable[str],
-                 data_shapes: Mapping[str, tf.TensorShape],
-                 data_dtypes: Mapping[str, tf.DType],
+                 data_spec: Mapping[str, tf.TensorSpec],
                  predictor: networks.predictors.Predictor = gin.REQUIRED,
                  disable_tf_optimization: bool = False,
                  ) -> None:
         super().__init__(batch_dims=2)
         self._observation_components = list(observation_components)
-        self._data_shapes = data_shapes
-        self._data_dtypes = data_dtypes
-        self._batch_size = next(iter(data_shapes.values()))[0]
+        self._data_spec = data_spec
+        self._batch_size = next(iter(data_spec.values())).shape[0]
 
         if disable_tf_optimization or is_debugging():
             logger.warning('Running without tf.function optimization.')
@@ -49,7 +47,7 @@ class Model(auto_shape.Model):
         )
         self.decoders = {'image': networks.ExtraBatchDim(networks.Decoder(), name='image_decoder')}
         for key in sorted(additional_observations | {'reward'}):
-            data_shape = data_shapes[key][2:].as_list()
+            data_shape = data_spec[key].shape[2:].as_list()
             self.decoders[key] = self._get_vector_decoder(data_shape,
                                                           name=f'{key}_decoder')
         # Layers in a dict are not automatically tracked, so we add them manually
@@ -85,10 +83,10 @@ class Model(auto_shape.Model):
     def dummy_data(self) -> Dict[str, tf.Tensor]:
         """Create dummy data suitable for initializing the model's weights"""
         data = {}
-        for key in self._data_shapes.keys():
+        for key in self._data_spec.keys():
             if key != 'length':
-                data[key] = tf.zeros([2, 2] + self._data_shapes[key][2:], self._data_dtypes[key])
-        data['length'] = tf.constant([2, 2], self._data_dtypes['length'])
+                data[key] = tf.zeros([2, 2] + self._data_spec[key].shape[2:], self._data_spec[key].dtype)
+        data['length'] = tf.constant([2, 2], self._data_spec['length'].dtype)
         return data
 
     def closed_loop(self, data: Mapping[str, tf.Tensor]) -> Tuple[List[tf.Tensor], List[tf.Tensor]]:
@@ -191,8 +189,7 @@ class Model(auto_shape.Model):
         path = Path(filepath)
         additional_data_file = path.parent / 'checkpoint_additional_data.pickle'
         additional_data = {'observation_components': self._observation_components,
-                           'data_shapes': self._data_shapes,
-                           'data_dtypes': self._data_dtypes}
+                           'data_spec': self._data_spec}
         with open(additional_data_file, 'wb') as f1:
             pickle.dump(additional_data, f1, pickle.HIGHEST_PROTOCOL)
         latest_checkpoint_file = path.parent / 'checkpoint_latest'
@@ -203,13 +200,12 @@ class Model(auto_shape.Model):
 @measure_time
 @gin.configurable(whitelist=['optimizer'])
 def get_model(observation_components: Iterable[str],
-              data_shapes: Mapping[str, tf.TensorShape],
-              data_dtypes: Mapping[str, tf.DType],
+              data_spec: Mapping[str, tf.TensorSpec],
               optimizer: tf.keras.optimizers.Optimizer,
               ) -> Model:
     """Returns a built model with random weights"""
     logger.info(f'Building model...')
-    model = Model(observation_components, data_shapes, data_dtypes)
+    model = Model(observation_components, data_spec)
     model.compile(optimizer=optimizer, loss=None)
     model.build_with_input(model.dummy_data)  # Initialize weights
     model.reset_metrics()

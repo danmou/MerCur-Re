@@ -70,7 +70,7 @@ def train(logdir: Path,
         writer = tf.summary.create_file_writer(str(logdir / 'tb_logs' / 'train'))
         if checkpoint is None:
             with trace_graph(writer):
-                model = get_model(observation_components, train_data.output_shapes, train_data.output_types)
+                model = get_model(observation_components, train_data.element_spec)
             start_epoch = 0
         else:
             model, start_epoch = restore_model(checkpoint, logdir)
