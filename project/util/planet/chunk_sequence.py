@@ -17,10 +17,12 @@ from typing import Dict, Optional, cast
 import tensorflow as tf
 
 
+@tf.function
 def chunk_sequence(sequence: Dict[str, tf.Tensor],
                    chunk_length: int,
                    randomize: bool = True,
                    num_chunks: Optional[int] = None,
+                   success_padding: int = 0,
                    ) -> Dict[str, tf.Tensor]:
     """Split a nested dict of sequence tensors into a batch of chunks.
 
@@ -32,15 +34,17 @@ def chunk_sequence(sequence: Dict[str, tf.Tensor],
     the true length)
 
     Args:
-      sequence: Dict of tensors with time dimension.
-      chunk_length: Size of chunks the sequence will be split into.
-      randomize: Start chunking from a random offset in the sequence,
-          enforcing that at least one chunk is generated.
-      num_chunks: Optionally specify the exact number of chunks to be extracted
-          from the sequence. Requires input to be long enough.
+        sequence: Dict of tensors with time dimension.
+        chunk_length: Size of chunks the sequence will be split into.
+        randomize: Start chunking from a random offset in the sequence,
+            enforcing that at least one chunk is generated.
+        num_chunks: Optionally specify the exact number of chunks to be extracted
+            from the sequence. Requires input to be long enough.
+        success_padding: Number of padding elements equal to the last element to
+            add after successful episodes.
 
     Returns:
-      Dict of sequence tensors with chunk dimension.
+        Dict of sequence tensors with chunk dimension.
     """
     with tf.device('/cpu:0'):
         length: int
@@ -48,6 +52,12 @@ def chunk_sequence(sequence: Dict[str, tf.Tensor],
             length = sequence.pop('length')
         else:
             length = tf.shape(tf.nest.flatten(sequence)[0])[0]
+
+        if success_padding and 'success' in sequence:
+            if tf.cast(sequence['success'][-1], tf.bool):
+                sequence = tf.nest.map_structure(lambda x: tf.concat([x] + [x[tf.newaxis, -1]] * success_padding, 0),
+                                                 sequence)
+                length += success_padding
 
         def pad_sequence(tensor):
             pad_amount = tf.maximum(0, chunk_length - length)

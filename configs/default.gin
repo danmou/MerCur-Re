@@ -4,7 +4,10 @@ logging.module_levels = {'matplotlib': 'WARNING', 'PIL': 'WARNING', 'imageio_ffm
 ### Planet ###
 # Task
 training.tasks = [@habitat_task()]
+
+# Data preprocessing
 numpy_episodes.train_action_noise = 0.3
+numpy_episodes.success_padding = 32  # Number of padding elements equal to the last element to add after successful episodes
 
 # Schedule
 training.num_seed_episodes = 40

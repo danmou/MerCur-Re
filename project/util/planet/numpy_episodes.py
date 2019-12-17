@@ -31,25 +31,29 @@ from .preprocess import preprocess
 Episode = Dict[str, np.ndarray]
 
 
-@gin.configurable(whitelist=['num_chunks', 'loader_update_every', 'train_action_noise'])
+@gin.configurable(whitelist=['num_chunks', 'loader_update_every', 'train_action_noise', 'success_padding'])
 def numpy_episodes(train_dir: str,
                    test_dir: str,
                    shape: Tuple[int, int],
                    num_chunks: Optional[int] = 1,
                    loader_update_every: int = 1000,
-                   train_action_noise: float = 0.3) -> Tuple[tf.data.Dataset, tf.data.Dataset]:
+                   train_action_noise: float = 0.3,
+                   success_padding: int = 0,
+                   ) -> Tuple[tf.data.Dataset, tf.data.Dataset]:
     """Read sequences stored as compressed Numpy files as a TensorFlow dataset.
 
     Args:
-      train_dir: Directory containing NPZ files of the training dataset.
-      test_dir: Directory containing NPZ files of the testing dataset.
-      shape: Tuple of batch size and chunk length for the datasets.
-      num_chunks: Number of chunks to extract from each sequence.
-      loader_update_every: Number of episodes between loader cache updates.
-      train_action_noise: Amount of noise to add to actions of training episodes
+        train_dir: Directory containing NPZ files of the training dataset.
+        test_dir: Directory containing NPZ files of the testing dataset.
+        shape: Tuple of batch size and chunk length for the datasets.
+        num_chunks: Number of chunks to extract from each sequence.
+        loader_update_every: Number of episodes between loader cache updates.
+        train_action_noise: Amount of noise to add to actions of training episodes
+        success_padding: Number of padding elements equal to the last element to
+            add after successful episodes.
 
     Returns:
-      Structured data from numpy episodes as Tensors.
+        Structured data from numpy episodes as Tensors.
     """
     loader = recent_loader
     dtypes, shapes, _ = _read_spec(train_dir)
@@ -62,7 +66,7 @@ def numpy_episodes(train_dir: str,
 
     def chunking(x: Dict[str, tf.Tensor]) -> tf.data.Dataset:
         return tf.data.Dataset.from_tensor_slices(
-            chunk_sequence(x, shape[1], True, num_chunks))
+            chunk_sequence(x, shape[1], True, num_chunks, success_padding))
 
     def sequence_preprocess_fn(sequence: Dict[str, tf.Tensor]) -> Dict[str, tf.Tensor]:
         sequence['image'] = preprocess(sequence['image'])

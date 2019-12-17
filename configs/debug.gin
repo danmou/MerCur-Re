@@ -21,6 +21,7 @@ predictors.RSSM.num_layers = 1
 Model.decoders.num_layers = 1
 Model.decoders.num_units = 10
 training.batch_shape = (2, 10)  # [batch_size, time_batch]
+numpy_episodes.success_padding = 1
 numpy_episodes.loader_update_every = 5
 CrossEntropyMethod.horizon = 10
 CrossEntropyMethod.iterations = 2
