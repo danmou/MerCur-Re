@@ -24,6 +24,7 @@ from project.util import PrettyPrinter, Statistics
 from project.util.planet.numpy_episodes import episode_reader
 from project.util.planet.preprocess import postprocess, preprocess
 from project.util.summaries import prediction_trajectory_summary, video_summary
+from project.util.system import get_memory_usage
 from project.util.timing import measure_time
 
 
@@ -167,6 +168,7 @@ class LoggingCallback(callbacks.Callback):
         wandb_row['epoch_time'] = epoch_time
         wandb_row['step_time'] = epoch_time / self._steps
         wandb_row['steps'] = log_epoch * self._steps
+        wandb_row['memory'] = get_memory_usage()
         self._prev_time = current_time
         self._steps = 0
         wandb.log(wandb_row, step=epoch)

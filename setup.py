@@ -18,6 +18,7 @@ requirements = [
     'matplotlib',
     'moviepy<1.0',  # required for wandb video summaries
     'numpy<1.17',  # 1.17 results in deprecation warnings with TF 1.15
+    'psutil',
     'scikit-image',
     'scipy',
     'tqdm',
