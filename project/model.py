@@ -5,7 +5,7 @@
 import pickle
 import re
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, cast
+from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Tuple, cast
 
 import gin
 import tensorflow as tf
@@ -89,14 +89,14 @@ class Model(auto_shape.Model):
         data['length'] = tf.constant([2, 2], self._data_spec['length'].dtype)
         return data
 
-    def closed_loop(self, data: Mapping[str, tf.Tensor]) -> Tuple[List[tf.Tensor], List[tf.Tensor]]:
+    def closed_loop(self, data: Mapping[str, tf.Tensor]) -> Tuple[Tuple[tf.Tensor, ...], Tuple[tf.Tensor, ...]]:
         embedded = self.encoder(data)
         use_obs = tf.ones(tf.shape(embedded[:, :, :1])[:3], tf.bool)
         prior, posterior = self.rnn((embedded, data['action'], use_obs), mask=self._get_mask(data))
         return prior, posterior
 
     @gin.configurable(whitelist=['context'])
-    def open_loop(self, data: Mapping[str, tf.Tensor], context: int = 5) -> List[tf.Tensor]:
+    def open_loop(self, data: Mapping[str, tf.Tensor], context: int = 5) -> Tuple[tf.Tensor, ...]:
         embedded = self.encoder(data)
         mask = self._get_mask(data)
         context = min(mask.shape[1] - 1, context)
@@ -108,7 +108,7 @@ class Model(auto_shape.Model):
         open_prior, _ = self.rnn((tf.zeros_like(embedded[:, context:]), data['action'][:, context:], use_obs),
                                  initial_state=last_posterior,
                                  mask=mask[:, context:])
-        return cast(List[tf.Tensor], tf.nest.map_structure(lambda x, y: tf.concat([x, y], 1), closed_posterior, open_prior))
+        return cast(Tuple[tf.Tensor, ...], tf.nest.map_structure(lambda x, y: tf.concat([x, y], 1), closed_posterior, open_prior))
 
     def decode(self, state_features: tf.Tensor) -> Dict[str, tf.Tensor]:
         reconstructions = {}
@@ -139,8 +139,8 @@ class Model(auto_shape.Model):
     @gin.configurable(whitelist=['free_nats'])
     @tf.function(experimental_relax_shapes=True)
     def divergence_loss(self,
-                        prior: List[tf.Tensor],
-                        posterior: List[tf.Tensor],
+                        prior: Tuple[tf.Tensor, ...],
+                        posterior: Tuple[tf.Tensor, ...],
                         mask: Optional[tf.Tensor] = None,
                         free_nats: float = 3.0,
                         ) -> tf.Tensor:

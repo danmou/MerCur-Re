@@ -2,7 +2,7 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import List, Optional, Type
+from typing import Optional, Tuple, Type
 
 import gin
 import gym.spaces
@@ -31,21 +31,21 @@ class MPCAgent(Agent):
         self._predictor = model.predictor
         self._encoder = model.encoder
         self._objective_decoder = model.decoders[objective]
-        self._state = [tf.Variable(x) for x in self._predictor.zero_state(1, tf.float32)]
+        self._state = tuple(tf.Variable(x) for x in self._predictor.zero_state(1, tf.float32))
         self._planner = planner(self._predictor, self._objective_fn, self._action_space)
         self._exploration_noise = exploration_noise
 
-    def _objective_fn(self, state: List[tf.Tensor]) -> tf.Tensor:
+    def _objective_fn(self, state: Tuple[tf.Tensor, ...]) -> tf.Tensor:
         obj = self._objective_decoder(self._predictor.state_to_features(state))
         return tf.reduce_sum(obj, axis=1)
 
     @property
-    def state(self) -> List[tf.Variable]:
+    def state(self) -> Tuple[tf.Variable, ...]:
         return self._state
 
     @state.setter  # type: ignore[misc]  # mypy/issues/1362
     @tf.function
-    def state(self, value: List[tf.Tensor]) -> None:
+    def state(self, value: Tuple[tf.Tensor, ...]) -> None:
         tf.nest.assert_same_structure(value, self._state)
         assert all(a.shape == b.shape for a, b in zip(value, self._state))
         for s, v in zip(self._state, value):
@@ -53,7 +53,7 @@ class MPCAgent(Agent):
 
     @tf.function
     def reset(self) -> None:
-        self.state = list(tf.zeros_like(s) for s in self.state)  # type: ignore[misc]  # mypy/issues/1362
+        self.state = tuple(tf.zeros_like(s) for s in self.state)  # type: ignore[misc]  # mypy/issues/1362
 
     @tf.function
     def observe(self, observations: Observations, action: Optional[tf.Tensor]) -> None:

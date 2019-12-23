@@ -16,7 +16,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, List, Optional
+from typing import Any, Optional, Tuple
 
 import gin
 import tensorflow as tf
@@ -81,7 +81,7 @@ class SequentialNormalBlock(auto_shape.Layer):
         self._mean_layer = auto_shape.Dense(output_size, activation=None)
         self._stddev_layer = auto_shape.Dense(output_size, activation='softplus')
 
-    def call(self, inputs: tf.Tensor) -> List[tf.Tensor]:
+    def call(self, inputs: tf.Tensor) -> Tuple[tf.Tensor, ...]:
         hidden = self._hidden_layers(inputs)
         mean = self._mean_layer(hidden)
         stddev = self._stddev_layer(hidden)
@@ -90,7 +90,7 @@ class SequentialNormalBlock(auto_shape.Layer):
             sample = mean
         else:
             sample = tfd.MultivariateNormalDiag(mean, stddev).sample()
-        return list(StateDist(mean, stddev, sample))
+        return tuple(StateDist(mean, stddev, sample))
 
 
 @gin.configurable(module='predictors')
@@ -143,20 +143,20 @@ class RSSM(Predictor):
         self._posterior_dist = SequentialNormalBlock(**kwargs, name=f'{name}_posterior_block')  # type: ignore[arg-type]
         super().__init__(name=name)
 
-    def state_to_features(self, state: List[tf.Tensor]) -> tf.Tensor:
+    def state_to_features(self, state: Tuple[tf.Tensor, ...]) -> tf.Tensor:
         return FullState(*state).to_features()
 
     def state_divergence(self,
-                         state1: List[tf.Tensor],
-                         state2: List[tf.Tensor],
+                         state1: Tuple[tf.Tensor, ...],
+                         state2: Tuple[tf.Tensor, ...],
                          mask: Optional[tf.Tensor] = None) -> tf.Tensor:
         return FullState(*state1).state.divergence(FullState(*state2).state, mask)
 
     @property
-    def state_size(self) -> List[int]:
-        return [self._state_size, self._state_size, self._state_size, self._belief_size]
+    def state_size(self) -> Tuple[int, ...]:
+        return self._state_size, self._state_size, self._state_size, self._belief_size
 
-    def _transition(self, prev_state_unpacked: List[tf.Tensor], prev_action: tf.Tensor) -> tf.Tensor:
+    def _transition(self, prev_state_unpacked: Tuple[tf.Tensor, ...], prev_action: tf.Tensor) -> tf.Tensor:
         """Compute next (deterministic) belief."""
         prev_state = FullState(*prev_state_unpacked)
         hidden = tf.concat([prev_state.state.sample, prev_action], -1)
@@ -164,17 +164,21 @@ class RSSM(Predictor):
         belief, _ = self._cell(hidden, [prev_state.belief])
         return belief
 
-    def _prior(self, prev_state_unpacked: List[tf.Tensor], prev_action: tf.Tensor) -> List[tf.Tensor]:
+    def _prior(self, prev_state_unpacked: Tuple[tf.Tensor, ...], prev_action: tf.Tensor) -> Tuple[tf.Tensor, ...]:
         """Compute prior next state by applying the transition dynamics."""
         belief = self._transition(prev_state_unpacked, prev_action)
         prior_state = self._prior_dist(belief)
         prior = FullState(state=StateDist(*prior_state), belief=belief)
-        return list(prior)
+        return tuple(prior)
 
-    def _posterior(self, prev_state_unpacked: List[tf.Tensor], prev_action: tf.Tensor, latent_obs: tf.Tensor) -> List[tf.Tensor]:
+    def _posterior(self,
+                   prev_state_unpacked: Tuple[tf.Tensor, ...],
+                   prev_action: tf.Tensor,
+                   latent_obs: tf.Tensor,
+                   ) -> Tuple[tf.Tensor, ...]:
         """Compute posterior state from previous state and current observation."""
         belief = self._transition(prev_state_unpacked, prev_action)
         hidden = tf.concat([belief, latent_obs], -1)
         posterior_state_unpacked = self._posterior_dist(hidden)
         posterior = FullState(state=StateDist(*posterior_state_unpacked), belief=belief)
-        return list(posterior)
+        return tuple(posterior)

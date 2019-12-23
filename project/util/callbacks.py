@@ -5,7 +5,7 @@
 import time
 from functools import partial
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, MutableMapping, Optional, SupportsFloat, Union, cast
+from typing import Any, Dict, Mapping, MutableMapping, Optional, SupportsFloat, Tuple, Union, cast
 
 import gin
 import gym
@@ -223,7 +223,7 @@ class PredictionSummariesCallback(callbacks.Callback):
     def _postprocess_images(images: tf.Tensor) -> tf.Tensor:
         return tf.clip_by_value(postprocess(images), 0.0, 1.0)
 
-    def _get_reconstructions(self, states: List[tf.Tensor]) -> Dict[str, tf.Tensor]:
+    def _get_reconstructions(self, states: Tuple[tf.Tensor, ...]) -> Dict[str, tf.Tensor]:
         reconstructions = self._model.decode(self._model.predictor.state_to_features(states))
         reconstructions['image'] = self._postprocess_images(reconstructions['image'])
         return reconstructions

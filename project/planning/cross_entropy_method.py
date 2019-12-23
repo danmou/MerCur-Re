@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, List, Union
+from typing import Callable, Tuple, Union
 
 import gin
 import gym.spaces
@@ -29,7 +29,7 @@ from .base import Planner
 class CrossEntropyMethod(Planner):
     def __init__(self,
                  predictor: Predictor,
-                 objective_fn: Callable[[List[tf.Tensor]], tf.Tensor],
+                 objective_fn: Callable[[Tuple[tf.Tensor, ...]], tf.Tensor],
                  action_space: gym.spaces.box,
                  horizon: int = 12,
                  amount: int = 1000,
@@ -44,8 +44,8 @@ class CrossEntropyMethod(Planner):
         self._embedded_shape = getattr(predictor, 'input_shape', None)
         self._rnn = RNN(predictor, return_sequences=True, name='planner_rnn')
 
-    @tf.function
-    def __call__(self, initial_state: List[Union[tf.Tensor, tf.Variable]]) -> tf.Tensor:
+    @tf.function(experimental_autograph_options=tf.autograph.experimental.Feature.ASSERT_STATEMENTS)
+    def __call__(self, initial_state: Tuple[Union[tf.Tensor, tf.Variable], ...]) -> tf.Tensor:
         """
         Calculates an action sequence of length `horizon` using the following method:
         ```

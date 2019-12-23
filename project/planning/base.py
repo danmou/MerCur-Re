@@ -3,7 +3,7 @@
 # (C) 2019, Daniel Mouritzen
 
 import abc
-from typing import Callable, List, Union
+from typing import Callable, Tuple, Union
 
 import gym.spaces
 import tensorflow as tf
@@ -14,7 +14,7 @@ from project.networks.predictors import Predictor
 class Planner(abc.ABC):
     def __init__(self,
                  predictor: Predictor,
-                 objective_fn: Callable[[List[tf.Tensor]], tf.Tensor],
+                 objective_fn: Callable[[Tuple[tf.Tensor, ...]], tf.Tensor],
                  action_space: gym.spaces.box,
                  ) -> None:
         self._predictor = predictor
@@ -22,5 +22,5 @@ class Planner(abc.ABC):
         self._action_space = action_space
 
     @abc.abstractmethod
-    def __call__(self, initial_state: List[Union[tf.Tensor, tf.Variable]]) -> tf.Tensor:
+    def __call__(self, initial_state: Tuple[Union[tf.Tensor, tf.Variable], ...]) -> tf.Tensor:
         raise NotImplementedError
