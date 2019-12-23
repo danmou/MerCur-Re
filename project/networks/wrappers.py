@@ -30,11 +30,12 @@ class ExtraBatchDim(auto_shape.Wrapper):
     def _uncombine(self, tensor: tf.Tensor, batch_shape: tf.TensorShape) -> tf.Tensor:
         return tf.reshape(tensor, batch_shape + tensor.shape[1:])
 
+    @tf.function
     def call(self, input: Union[tf.Tensor, Dict[str, tf.Tensor]], **kwargs: Any) -> tf.Tensor:
         input_flattened = tf.nest.flatten(input)
         batch_shape = input_flattened[0].shape[:2]
-        assert all(i.shape[:2].as_list() == batch_shape.as_list() for i in input_flattened), \
-            f'Mismatched batch dimensions in input: {input_flattened}'
+        assert all(i.shape[:2].as_list() == batch_shape.as_list() for i in input_flattened), (
+            f'Mismatched batch dimensions in input: {input_flattened}')
         input_combined = tf.nest.map_structure(self._combine, input)
         output_combined = self.layer(input_combined, **kwargs)
         return tf.nest.map_structure(lambda t: self._uncombine(t, batch_shape), output_combined)

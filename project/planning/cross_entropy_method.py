@@ -58,8 +58,7 @@ class CrossEntropyMethod(Planner):
         ```
         """
         action_shape = self._action_space.low.shape
-        assert initial_state[0].shape[0] == 1, f'Initial state can only have a single batch element, ' \
-                                               f'not {initial_state[0].shape[0]}'
+        assert initial_state[0].shape[0] == 1, f'Initial state can only have a single batch element, not {initial_state[0].shape[0]}'
         initial_state = tf.nest.map_structure(lambda x: tf.concat([x] * self._amount, 0), initial_state)
         use_obs = tf.zeros([self._amount, self._horizon, 1], tf.bool)
         obs = tf.zeros([self._amount, self._horizon] + self._predictor.input_shape[0][1:])
