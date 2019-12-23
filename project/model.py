@@ -163,7 +163,7 @@ class Model(auto_shape.Model):
         log_probs = {}
         for name, reconstruction in reconstructions.items():
             target = targets[name]
-            log_prob = losses.log_prob(reconstruction, target, batch_dims=2)
+            log_prob = losses.mse(reconstruction, target, batch_dims=2)
             if mask is not None:
                 log_prob = tf.boolean_mask(log_prob, mask)
             if log_prob.shape[0] == 0:

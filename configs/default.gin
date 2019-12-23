@@ -30,9 +30,9 @@ LoggingCallback.batch_header_period = 10  # how many times to log before reprint
 divergence_loss.free_nats = 3.0
 combine_losses.scales = {
     'divergence': 1.0,
-    'image_reconstruction': -1.0,
-    'reward_reconstruction': -10.0,
-    'goal_reconstruction': -10.0,
+    'image_reconstruction': 6144.0,
+    'reward_reconstruction': 5.0,
+    'goal_reconstruction': 10.0,
 }
 
 # Model complexity
