@@ -12,14 +12,14 @@ from loguru import logger
 from project.agents import MPCAgent, RandomAgent
 from project.model import get_model, restore_model
 from project.tasks import Task
-from project.util.callbacks import (CheckpointCallback,
-                                    DataCollectionCallback,
-                                    EvaluateCallback,
-                                    LoggingCallback,
-                                    PredictionSummariesCallback)
 from project.util.files import link_directory_contents
 from project.util.planet.numpy_episodes import numpy_episodes
 from project.util.tf import get_distribution_strategy, trace_graph
+from project.util.tf.callbacks import (CheckpointCallback,
+                                       DataCollectionCallback,
+                                       EvaluateCallback,
+                                       LoggingCallback,
+                                       PredictionSummariesCallback)
 from project.util.timing import measure_time
 
 from .simulator import Simulator

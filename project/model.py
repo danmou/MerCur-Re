@@ -12,10 +12,9 @@ import tensorflow as tf
 from loguru import logger
 
 from project import networks
-from project.util import losses
 from project.util.files import get_latest_checkpoint
 from project.util.system import is_debugging
-from project.util.tf import auto_shape
+from project.util.tf import auto_shape, losses
 from project.util.timing import measure_time
 
 

@@ -9,8 +9,8 @@ from typing import Any, Optional, Tuple
 
 import tensorflow as tf
 
-from project.util.nested import FlatDataClass
 from project.util.tf import auto_shape
+from project.util.tf.nested import FlatDataClass
 
 
 @dataclass(init=False)
