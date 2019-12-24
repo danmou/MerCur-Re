@@ -6,6 +6,7 @@ dependencies:
   - tensorflow-gpu=2.0.*
   - numpy=1.16.*
   - click
+  - gperftools
   - loguru
   - matplotlib
   - scikit-image
