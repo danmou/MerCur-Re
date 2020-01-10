@@ -14,7 +14,8 @@ from loguru import logger
 from project import networks
 from project.util.files import get_latest_checkpoint
 from project.util.system import is_debugging
-from project.util.tf import auto_shape, losses
+from project.util.tf import auto_shape
+from project.util.tf.losses import mse
 from project.util.timing import measure_time
 
 
@@ -121,13 +122,12 @@ class Model(auto_shape.Model):
         reconstructions = self.decode(self.rnn.state_to_features(posterior))
         mask = self._get_mask(inputs)
         losses = {'divergence': self.divergence_loss(prior, posterior, mask)}
-        losses.update(self.reconstruction_log_probs(inputs, reconstructions, mask))
+        losses.update(self.reconstruction_losses(inputs, reconstructions, mask))
         combined_loss = self.combine_losses(losses)
         self.add_loss(combined_loss, inputs=True)
         self.add_metric(combined_loss, aggregation='mean', name='loss')
         for name, loss in losses.items():
             self.add_metric(loss, aggregation='mean', name=name)
-        # return prior, posterior, open_loop, reconstructions
         return tf.constant(0.0)
 
     @gin.configurable(whitelist=['free_nats'])
@@ -148,21 +148,17 @@ class Model(auto_shape.Model):
         return tf.reduce_mean(divergence_loss, name='divergence_loss')
 
     @tf.function(experimental_relax_shapes=True)
-    def reconstruction_log_probs(self,
-                                 targets: Mapping[str, tf.Tensor],
-                                 reconstructions: Mapping[str, tf.Tensor],
-                                 mask: Optional[tf.Tensor] = None,
-                                 ) -> Dict[str, tf.Tensor]:
-        log_probs = {}
+    def reconstruction_losses(self,
+                              targets: Mapping[str, tf.Tensor],
+                              reconstructions: Mapping[str, tf.Tensor],
+                              mask: Optional[tf.Tensor] = None,
+                              ) -> Dict[str, tf.Tensor]:
+        losses = {}
         for name, reconstruction in reconstructions.items():
             target = targets[name]
-            log_prob = losses.mse(reconstruction, target, batch_dims=2)
-            if mask is not None:
-                log_prob = tf.boolean_mask(log_prob, mask)
-            if log_prob.shape[0] == 0:
-                log_prob = tf.constant(0.0)
-            log_probs[f'{name}_reconstruction'] = tf.reduce_mean(log_prob, name=f'{name}_reconstruction_loss')
-        return log_probs
+            loss = mse(reconstruction, target, mask)
+            losses[f'{name}_reconstruction'] = tf.identity(loss, name=f'{name}_reconstruction_loss')
+        return losses
 
     @gin.configurable(whitelist=['scales'])
     def combine_losses(self,
