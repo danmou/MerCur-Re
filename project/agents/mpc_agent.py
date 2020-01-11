@@ -28,7 +28,7 @@ class MPCAgent(Agent):
                  exploration_noise: float = 0.0,
                  ) -> None:
         super().__init__(action_space)
-        self._predictor = model.predictor
+        self._predictor = model.rnn.predictor
         self._encoder = model.encoder
         self._objective_decoder = model.decoders[objective]
         self._state = tuple(tf.Variable(x) for x in self._predictor.zero_state(1, tf.float32))

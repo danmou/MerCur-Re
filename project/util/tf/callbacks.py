@@ -224,7 +224,7 @@ class PredictionSummariesCallback(callbacks.Callback):
         return tf.clip_by_value(postprocess(images), 0.0, 1.0)
 
     def _get_reconstructions(self, states: Tuple[tf.Tensor, ...]) -> Dict[str, tf.Tensor]:
-        reconstructions = self._model.decode(self._model.predictor.state_to_features(states))
+        reconstructions = self._model.decode(self._model.rnn.state_to_features(states))
         reconstructions['image'] = self._postprocess_images(reconstructions['image'])
         return reconstructions
 

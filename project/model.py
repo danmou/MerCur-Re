@@ -5,7 +5,7 @@
 import pickle
 import re
 from pathlib import Path
-from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Tuple, cast
+from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Tuple, Type, cast
 
 import gin
 import tensorflow as tf
@@ -18,13 +18,14 @@ from project.util.tf import auto_shape, losses
 from project.util.timing import measure_time
 
 
-@gin.configurable(whitelist=['predictor', 'disable_tf_optimization'])
+@gin.configurable(whitelist=['predictor_class', 'rnn_class', 'disable_tf_optimization'])
 class Model(auto_shape.Model):
     """This class defines the top-level model structure and losses"""
     def __init__(self,
                  observation_components: Iterable[str],
                  data_spec: Mapping[str, tf.TensorSpec],
-                 predictor: networks.predictors.Predictor = gin.REQUIRED,
+                 predictor_class: Type[networks.predictors.Predictor] = gin.REQUIRED,
+                 rnn_class: Type[networks.rnns.RNN] = gin.REQUIRED,
                  disable_tf_optimization: bool = False,
                  ) -> None:
         super().__init__(batch_dims=2)
@@ -53,8 +54,7 @@ class Model(auto_shape.Model):
         for layer in self.decoders.values():
             self._layers.append(layer)
         self._track_layers(self._layers)
-        self.predictor = predictor
-        self.rnn = auto_shape.RNN(self.predictor, return_sequences=True, name='rnn')
+        self.rnn = rnn_class(predictor_class)
 
     @staticmethod
     @gin.configurable('Model.decoders', whitelist=['num_units', 'num_layers', 'activation'])
@@ -91,8 +91,7 @@ class Model(auto_shape.Model):
 
     def closed_loop(self, data: Mapping[str, tf.Tensor]) -> Tuple[Tuple[tf.Tensor, ...], Tuple[tf.Tensor, ...]]:
         embedded = self.encoder(data)
-        use_obs = tf.ones(tf.shape(embedded[:, :, :1])[:3], tf.bool)
-        prior, posterior = self.rnn((embedded, data['action'], use_obs), mask=self._get_mask(data))
+        prior, posterior = self.rnn.closed_loop(embedded, data['action'], mask=self._get_mask(data))
         return prior, posterior
 
     @gin.configurable(whitelist=['context'])
@@ -100,15 +99,10 @@ class Model(auto_shape.Model):
         embedded = self.encoder(data)
         mask = self._get_mask(data)
         context = min(mask.shape[1] - 1, context)
-        use_obs = tf.ones(tf.shape(embedded[:, :context, :1])[:3], tf.bool)
-        _, closed_posterior = self.rnn((embedded[:, :context], data['action'][:, :context], use_obs),
-                                       mask=mask[:, :context])
-        use_obs = tf.zeros(tf.shape(embedded[:, context:, :1])[:3], tf.bool)
-        last_posterior = tf.nest.map_structure(lambda x: x[:, -1], closed_posterior)
-        open_prior, _ = self.rnn((tf.zeros_like(embedded[:, context:]), data['action'][:, context:], use_obs),
-                                 initial_state=last_posterior,
-                                 mask=mask[:, context:])
-        return cast(Tuple[tf.Tensor, ...], tf.nest.map_structure(lambda x, y: tf.concat([x, y], 1), closed_posterior, open_prior))
+        _, closed_loop = self.rnn.closed_loop(embedded[:, :context], data['action'][:, :context], mask=mask[:, :context])
+        last_posterior = tf.nest.map_structure(lambda x: x[:, -1], closed_loop)
+        open_loop = self.rnn.open_loop(data['action'][:, context:], initial_state=last_posterior, mask=mask[:, context:])
+        return cast(Tuple[tf.Tensor, ...], tf.nest.map_structure(lambda x, y: tf.concat([x, y], 1), closed_loop, open_loop))
 
     def decode(self, state_features: tf.Tensor) -> Dict[str, tf.Tensor]:
         reconstructions = {}
@@ -124,7 +118,7 @@ class Model(auto_shape.Model):
         if inputs['length'].shape.ndims > 1:
             inputs['length'] = inputs['length'][:, 0]
         prior, posterior = self.closed_loop(inputs)
-        reconstructions = self.decode(self.predictor.state_to_features(posterior))
+        reconstructions = self.decode(self.rnn.state_to_features(posterior))
         mask = self._get_mask(inputs)
         losses = {'divergence': self.divergence_loss(prior, posterior, mask)}
         losses.update(self.reconstruction_log_probs(inputs, reconstructions, mask))
@@ -144,8 +138,7 @@ class Model(auto_shape.Model):
                         mask: Optional[tf.Tensor] = None,
                         free_nats: float = 3.0,
                         ) -> tf.Tensor:
-        # TODO: Shouldn't we use tf.stop_gradient here? In principle we only want this loss to affect the prior
-        divergence_loss = self.predictor.state_divergence(posterior, prior, mask)
+        divergence_loss = self.rnn.state_divergence(posterior, prior, mask)
         if free_nats:
             divergence_loss = tf.maximum(0.0, divergence_loss - float(free_nats))
         if mask is not None:

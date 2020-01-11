@@ -93,7 +93,8 @@ class SequentialNormalBlock(auto_shape.Layer):
         return tuple(StateDist(mean, stddev, sample))
 
 
-@gin.configurable(module='predictors')
+@gin.configurable(module='predictors', whitelist=['state_size', 'belief_size', 'embed_size', 'mean_only', 'min_stddev',
+                                                  'num_layers', 'activation'])
 class RSSM(Predictor):
     r"""
     Deterministic and stochastic state model.
@@ -122,8 +123,8 @@ class RSSM(Predictor):
                  embed_size: int = gin.REQUIRED,
                  mean_only: bool = False,
                  min_stddev: float = 0.1,
-                 activation: str = 'relu',
                  num_layers: int = 1,
+                 activation: str = 'relu',
                  name: str = 'rssm',
                  ) -> None:
         self._state_size = state_size
@@ -143,11 +144,12 @@ class RSSM(Predictor):
         self._posterior_dist = SequentialNormalBlock(**kwargs, name=f'{name}_posterior_block')  # type: ignore[arg-type]
         super().__init__(name=name)
 
-    def state_to_features(self, state: Tuple[tf.Tensor, ...]) -> tf.Tensor:
+    @staticmethod
+    def state_to_features(state: Tuple[tf.Tensor, ...]) -> tf.Tensor:
         return FullState(*state).to_features()
 
-    def state_divergence(self,
-                         state1: Tuple[tf.Tensor, ...],
+    @staticmethod
+    def state_divergence(state1: Tuple[tf.Tensor, ...],
                          state2: Tuple[tf.Tensor, ...],
                          mask: Optional[tf.Tensor] = None) -> tf.Tensor:
         return FullState(*state1).state.divergence(FullState(*state2).state, mask)
@@ -156,28 +158,28 @@ class RSSM(Predictor):
     def state_size(self) -> Tuple[int, ...]:
         return self._state_size, self._state_size, self._state_size, self._belief_size
 
-    def _transition(self, prev_state_unpacked: Tuple[tf.Tensor, ...], prev_action: tf.Tensor) -> tf.Tensor:
+    def transition(self, prev_state_unpacked: Tuple[tf.Tensor, ...], action: tf.Tensor) -> tf.Tensor:
         """Compute next (deterministic) belief."""
         prev_state = FullState(*prev_state_unpacked)
-        hidden = tf.concat([prev_state.state.sample, prev_action], -1)
+        hidden = tf.concat([prev_state.state.sample, action], -1)
         hidden = self._input_layers(hidden)
         belief, _ = self._cell(hidden, [prev_state.belief])
         return belief
 
-    def _prior(self, prev_state_unpacked: Tuple[tf.Tensor, ...], prev_action: tf.Tensor) -> Tuple[tf.Tensor, ...]:
+    def prior(self, prev_state_unpacked: Tuple[tf.Tensor, ...], action: tf.Tensor) -> Tuple[tf.Tensor, ...]:
         """Compute prior next state by applying the transition dynamics."""
-        belief = self._transition(prev_state_unpacked, prev_action)
+        belief = self.transition(prev_state_unpacked, action)
         prior_state = self._prior_dist(belief)
         prior = FullState(state=StateDist(*prior_state), belief=belief)
         return tuple(prior)
 
-    def _posterior(self,
-                   prev_state_unpacked: Tuple[tf.Tensor, ...],
-                   prev_action: tf.Tensor,
-                   latent_obs: tf.Tensor,
-                   ) -> Tuple[tf.Tensor, ...]:
+    def posterior(self,
+                  prev_state_unpacked: Tuple[tf.Tensor, ...],
+                  action: tf.Tensor,
+                  latent_obs: tf.Tensor,
+                  ) -> Tuple[tf.Tensor, ...]:
         """Compute posterior state from previous state and current observation."""
-        belief = self._transition(prev_state_unpacked, prev_action)
+        belief = self.transition(prev_state_unpacked, action)
         hidden = tf.concat([belief, latent_obs], -1)
         posterior_state_unpacked = self._posterior_dist(hidden)
         posterior = FullState(state=StateDist(*posterior_state_unpacked), belief=belief)

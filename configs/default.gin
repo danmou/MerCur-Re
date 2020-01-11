@@ -36,7 +36,8 @@ combine_losses.scales = {
 }
 
 # Model complexity
-Model.predictor = @predictors.RSSM()
+Model.predictor_class = @predictors.RSSM
+Model.rnn_class = @rnns.SimpleRNN
 predictors.RSSM.state_size = 40
 predictors.RSSM.belief_size = 300
 predictors.RSSM.embed_size = 300

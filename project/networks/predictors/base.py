@@ -24,21 +24,22 @@ class Predictor(auto_shape.AbstractRNNCell):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(dynamic=False, **kwargs)
 
-    def _prior(self, prev_state_unpacked: Tuple[tf.Tensor, ...], prev_action: tf.Tensor) -> Tuple[tf.Tensor, ...]:
+    def prior(self, prev_state_unpacked: Tuple[tf.Tensor, ...], prev_action: tf.Tensor) -> Tuple[tf.Tensor, ...]:
         raise NotImplementedError
 
-    def _posterior(self,
-                   prev_state_unpacked: Tuple[tf.Tensor, ...],
-                   prev_action: tf.Tensor,
-                   latent_obs: tf.Tensor,
-                   ) -> Tuple[tf.Tensor, ...]:
+    def posterior(self,
+                  prev_state_unpacked: Tuple[tf.Tensor, ...],
+                  prev_action: tf.Tensor,
+                  latent_obs: tf.Tensor,
+                  ) -> Tuple[tf.Tensor, ...]:
         raise NotImplementedError
 
-    def state_to_features(self, state: Tuple[tf.Tensor, ...]) -> tf.Tensor:
+    @staticmethod
+    def state_to_features(state: Tuple[tf.Tensor, ...]) -> tf.Tensor:
         raise NotImplementedError
 
-    def state_divergence(self,
-                         state1: Tuple[tf.Tensor, ...],
+    @staticmethod
+    def state_divergence(state1: Tuple[tf.Tensor, ...],
                          state2: Tuple[tf.Tensor, ...],
                          mask: Optional[tf.Tensor] = None) -> tf.Tensor:
         raise NotImplementedError
@@ -59,9 +60,9 @@ class Predictor(auto_shape.AbstractRNNCell):
              inputs: Tuple[tf.Tensor, tf.Tensor, tf.Tensor],
              prev_state_unpacked: Tuple[tf.Tensor, ...],
              ) -> Tuple[Tuple[Tuple[tf.Tensor, ...], Tuple[tf.Tensor, ...]], Tuple[tf.Tensor, ...]]:
-        obs, prev_action, use_obs = inputs
-        prior = self._prior(prev_state_unpacked, prev_action)
+        obs, action, use_obs = inputs
+        prior = self.prior(prev_state_unpacked, action)
         posterior = tf.cond(tf.reduce_any(use_obs),
-                            lambda: self._posterior(prev_state_unpacked, prev_action, obs),
+                            lambda: self.posterior(prev_state_unpacked, action, obs),
                             lambda: prior)
         return (prior, posterior), posterior
