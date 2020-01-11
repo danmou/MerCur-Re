@@ -36,12 +36,12 @@ combine_losses.scales = {
 }
 
 # Model complexity
-Model.predictor_class = @predictors.RSSM
+Model.predictor_class = @predictors.RSSMPredictor
+predictors.OpenLoopRSSMPredictor.state_size = 40
+predictors.OpenLoopRSSMPredictor.belief_size = 300
+predictors.OpenLoopRSSMPredictor.embed_size = 300
+predictors.OpenLoopRSSMPredictor.num_layers = 1
 Model.rnn_class = @rnns.SimpleRNN
-predictors.RSSM.state_size = 40
-predictors.RSSM.belief_size = 300
-predictors.RSSM.embed_size = 300
-predictors.RSSM.num_layers = 1
 Model.decoders.num_layers = 1  # used for reward and goal prediction
 Model.decoders.num_units = 100  # used for reward and goal prediction
 training.batch_shape = (64, 64)  # [batch_size, time_batch]

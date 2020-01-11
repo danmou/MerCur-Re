@@ -2,7 +2,7 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from .base import Predictor, State
-from .rssm import RSSM
+from .base import OpenLoopPredictor, Predictor, State
+from .rssm import OpenLoopRSSMPredictor, RSSMPredictor
 
-__all__ = ['Predictor', 'State', 'RSSM']
+__all__ = ['OpenLoopPredictor', 'Predictor', 'State', 'OpenLoopRSSMPredictor', 'RSSMPredictor']
