@@ -29,17 +29,17 @@ LoggingCallback.batch_header_period = 10  # how many times to log before reprint
 # Losses
 divergence_loss.free_nats = 3.0
 combine_losses.scales = {
-    'divergence': 1.0,
-    'image_reconstruction': 6144.0,
-    'reward_reconstruction': 5.0,
-    'goal_reconstruction': 10.0,
+    'divergence': 0.1,
+    'image_reconstruction': 600.0,
+    'reward_reconstruction': 0.5,
+    'goal_reconstruction': 1.0,
 }
 
 # Model complexity
 Model.predictor = @predictors.RSSM()
-predictors.RSSM.state_size = 30
-predictors.RSSM.belief_size = 200
-predictors.RSSM.embed_size = 200
+predictors.RSSM.state_size = 40
+predictors.RSSM.belief_size = 300
+predictors.RSSM.embed_size = 300
 predictors.RSSM.num_layers = 1
 Model.decoders.num_layers = 1  # used for reward and goal prediction
 Model.decoders.num_units = 100  # used for reward and goal prediction

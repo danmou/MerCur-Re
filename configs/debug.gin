@@ -14,6 +14,7 @@ CheckpointCallback.period = 2  # epochs between checkpoints
 EvaluateCallback.period = 2  # epochs between evaluations
 EvaluateCallback.num_episodes = 1  # episodes per evaluation
 PredictionSummariesCallback.period = 1
+LoggingCallback.batch_log_period = 1
 predictors.RSSM.state_size = 5
 predictors.RSSM.belief_size = 10
 predictors.RSSM.embed_size = 10
