@@ -10,6 +10,7 @@ import tensorflow as tf
 
 from project.networks.predictors import Predictor
 from project.util.tf import auto_shape
+from project.util.tf.losses import apply_mask
 
 
 class RNN(abc.ABC, auto_shape.Layer):
@@ -59,10 +60,31 @@ class RNN(abc.ABC, auto_shape.Layer):
              ) -> Tuple[Tuple[tf.Tensor, ...], Tuple[tf.Tensor, ...]]:
         raise NotImplementedError
 
+    @tf.function(experimental_relax_shapes=True)
+    def divergence_loss(self,
+                        prior: Tuple[tf.Tensor, ...],
+                        posterior: Tuple[tf.Tensor, ...],
+                        mask: Optional[tf.Tensor] = None,
+                        free_nats: float = 0.0,
+                        ) -> tf.Tensor:
+        divergence_loss = self.state_divergence(posterior, prior, mask)
+        if free_nats:
+            divergence_loss = tf.maximum(0.0, divergence_loss - float(free_nats))
+        divergence_loss = apply_mask(divergence_loss, mask, name='divergence_loss')
+        return divergence_loss
 
-@gin.configurable(module='rnns', whitelist=[])
+
+@gin.configurable(module='rnns', whitelist=['divergence_loss_scale', 'divergence_loss_free_nats'])
 class SimpleRNN(RNN):
-    def __init__(self, predictor_class: Type[Predictor], *, name: str = 'simple_rnn') -> None:
+    def __init__(self,
+                 predictor_class: Type[Predictor],
+                 *,
+                 divergence_loss_scale: float = 1.0,
+                 divergence_loss_free_nats: float = 3.0,
+                 name: str = 'simple_rnn',
+                 ) -> None:
+        self.divergence_loss_scale = divergence_loss_scale
+        self.divergence_loss_free_nats = divergence_loss_free_nats
         self._predictor = predictor_class(name=f'{name}_predictor')
         self.rnn = auto_shape.RNN(self._predictor, return_sequences=True, name=f'{name}_inner')
         super().__init__(predictor_class=predictor_class, name=name)
@@ -110,4 +132,7 @@ class SimpleRNN(RNN):
         prior: Tuple[tf.Tensor, ...]
         posterior: Tuple[tf.Tensor, ...]
         prior, posterior = self.rnn(inputs, initial_state=initial_state, mask=mask)
+        divergence_loss = self.divergence_loss(prior, posterior, mask=mask, free_nats=self.divergence_loss_free_nats)
+        self.add_loss(divergence_loss * self.divergence_loss_scale, inputs=True)
+        self.add_metric(divergence_loss, aggregation='mean', name=f'divergence')
         return prior, posterior

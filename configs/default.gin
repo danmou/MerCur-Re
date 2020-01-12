@@ -27,12 +27,12 @@ LoggingCallback.batch_log_period = 10
 LoggingCallback.batch_header_period = 10  # how many times to log before reprinting headers
 
 # Losses
-divergence_loss.free_nats = 3.0
-combine_losses.scales = {
-    'divergence': 0.1,
-    'image_reconstruction': 600.0,
-    'reward_reconstruction': 0.5,
-    'goal_reconstruction': 1.0,
+SimpleRNN.divergence_loss_free_nats = 3.0
+SimpleRNN.divergence_loss_scale = 0.1
+reconstruction_loss.scales = {
+    'image': 600.0,
+    'reward': 0.5,
+    'goal': 1.0,
 }
 
 # Model complexity

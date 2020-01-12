@@ -121,57 +121,28 @@ class Model(auto_shape.Model):
         prior, posterior = self.closed_loop(inputs)
         reconstructions = self.decode(self.rnn.state_to_features(posterior))
         mask = self._get_mask(inputs)
-        losses = {'divergence': self.divergence_loss(prior, posterior, mask)}
-        losses.update(self.reconstruction_losses(inputs, reconstructions, mask))
-        combined_loss = self.combine_losses(losses)
-        self.add_loss(combined_loss, inputs=True)
-        self.add_metric(combined_loss, aggregation='mean', name='loss')
-        for name, loss in losses.items():
-            self.add_metric(loss, aggregation='mean', name=name)
+        reconstruction_loss = self.reconstruction_loss(inputs, reconstructions, mask)
+        # Note: `add_loss` must be called directly from the `call` method
+        self.add_loss(reconstruction_loss, inputs=True)
+        self.add_metric(sum(self.losses), aggregation='mean', name='loss')
         return tf.constant(0.0)
 
-    @gin.configurable(whitelist=['free_nats'])
+    @gin.configurable(whitelist=['scales'])
     @tf.function(experimental_relax_shapes=True)
-    def divergence_loss(self,
-                        prior: Tuple[tf.Tensor, ...],
-                        posterior: Tuple[tf.Tensor, ...],
-                        mask: Optional[tf.Tensor] = None,
-                        free_nats: float = 3.0,
-                        ) -> tf.Tensor:
-        divergence_loss = self.rnn.state_divergence(posterior, prior, mask)
-        if free_nats:
-            divergence_loss = tf.maximum(0.0, divergence_loss - float(free_nats))
-        if mask is not None:
-            divergence_loss = tf.boolean_mask(divergence_loss, mask)
-        if divergence_loss.shape[0] == 0:
-            divergence_loss = tf.constant(0.0)
-        return tf.reduce_mean(divergence_loss, name='divergence_loss')
-
-    @tf.function(experimental_relax_shapes=True)
-    def reconstruction_losses(self,
-                              targets: Mapping[str, tf.Tensor],
-                              reconstructions: Mapping[str, tf.Tensor],
-                              mask: Optional[tf.Tensor] = None,
-                              ) -> Dict[str, tf.Tensor]:
-        losses = {}
+    def reconstruction_loss(self,
+                            targets: Mapping[str, tf.Tensor],
+                            reconstructions: Mapping[str, tf.Tensor],
+                            mask: Optional[tf.Tensor] = None,
+                            scales: Mapping[str, float] = gin.REQUIRED,
+                            ) -> tf.Tensor:
+        total = tf.constant(0.0)
         for name, reconstruction in reconstructions.items():
             target = targets[name]
-            loss = mse(reconstruction, target, mask)
-            losses[f'{name}_reconstruction'] = tf.identity(loss, name=f'{name}_reconstruction_loss')
-        return losses
-
-    @gin.configurable(whitelist=['scales'])
-    def combine_losses(self,
-                       all_losses: Mapping[str, tf.Tensor],
-                       scales: Mapping[str, float] = gin.REQUIRED,
-                       ) -> tf.Tensor:
-        total = 0.0
-        for name, loss in all_losses.items():
-            scale = scales.get(name, 0.0)
-            if not scale:
-                continue
+            scale = scales[name]
+            loss = mse(reconstruction, target, mask, name=f'{name}_reconstruction_loss')
+            self.add_metric(loss, aggregation='mean', name=f'{name}_reconstruction')
             total += scale * loss
-        return tf.identity(total, name='total_loss')
+        return total
 
     def save_weights(self, filepath: str, **kwargs: Any) -> None:
         super().save_weights(filepath, **kwargs)
