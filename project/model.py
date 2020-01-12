@@ -84,8 +84,9 @@ class Model(auto_shape.Model):
         data = {}
         for key in self._data_spec.keys():
             if key != 'length':
-                data[key] = tf.zeros([2, 2] + self._data_spec[key].shape[2:], self._data_spec[key].dtype)
-        data['length'] = tf.constant([2, 2], self._data_spec['length'].dtype)
+                data[key] = tf.zeros(self._data_spec[key].shape, self._data_spec[key].dtype)
+        batch_shape = data['image'].shape[:2]
+        data['length'] = tf.constant([[batch_shape[1]]] * batch_shape[0], self._data_spec['length'].dtype)
         return data
 
     def closed_loop(self, data: Mapping[str, tf.Tensor]) -> Tuple[Tuple[tf.Tensor, ...], Tuple[tf.Tensor, ...]]:

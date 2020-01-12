@@ -2,7 +2,7 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import Any, Optional, Union
+from typing import Any, List, Optional, Union
 
 import tensorflow as tf
 from tensorflow.keras import layers
@@ -14,10 +14,16 @@ class AutoShapeMixin:
     """
     Mixin for `tf.keras.layers.Layer`s and subclasses to automatically define input and output specs when model is
     built using `build_with_input`. Must be listed before `tf.keras.layers.Layer` when subclassing. Only works for
-    models and layers with static input and output shapes. First dimension is assumed to be batch dimension.
+    models and layers with static input and output shapes.
+    Args:
+        batch_dims: Number of dimensions to treat as batch dimensions (default 1)
+        min_batch_shape: List of positive integers giving the number of elements for each batch dimension to use
+            when building the graph (default [1]*batch_dims).
     """
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self.batch_dims: int = kwargs.pop('batch_dims', 1)
+        self.min_batch_shape: List[int] = kwargs.pop('min_batch_shape', [1] * self.batch_dims)
+        assert len(self.min_batch_shape) == self.batch_dims, 'min_batch_shape incompatible with batch_dims'
         super().__init__(*args, **kwargs)  # type: ignore[call-arg]  # mypy/issues/5887
         assert not getattr(self, 'dynamic'), 'AutoShapeMixin should not be used with dynamic layers!'
         self._input_spec: Optional[layers.InputSpec] = None
@@ -27,8 +33,13 @@ class AutoShapeMixin:
     def build_with_input(self, input: Union[Nested[tf.TensorSpec], Nested[tf.Tensor]], *args: Any, **kwargs: Any) -> None:
         bd = self.batch_dims
         self._input_spec = tf.nest.map_structure(
-            lambda x: layers.InputSpec(shape=[None] * bd + x.shape[bd:], dtype=x.dtype), input)
-        dummy_input = tf.nest.map_structure(lambda t: tf.zeros([2] * bd + t.shape[bd:], t.dtype), input)
+            lambda x: layers.InputSpec(shape=([None] * bd + x.shape[bd:])[:x.shape.ndims], dtype=x.dtype),
+            input)
+        dummy_input = tf.nest.map_structure(
+            lambda x: tf.zeros((list(self.min_batch_shape) + x.shape[bd:])[:x.shape.ndims], x.dtype),
+            input)
+        if 'mask' in kwargs:
+            kwargs['mask'] = tf.ones(self.min_batch_shape, tf.bool)
         dummy_output = super().__call__(dummy_input, *args, **kwargs)  # type: ignore[misc]  # mypy/issues/5887
         self._output_spec = tf.nest.map_structure(lambda x: layers.InputSpec(shape=[None] * bd + x.shape[bd:],
                                                                              dtype=x.dtype), dummy_output)
@@ -126,10 +137,7 @@ class RNN(AutoShapeMixin, layers.RNN):
     def build_with_input(self, input: Union[Nested[tf.TensorSpec], Nested[tf.Tensor]], *args: Any, **kwargs: Any) -> None:
         super().build_with_input(input, *args, **kwargs)
         if not self.cell.built_with_input:
-            def zero_state(size: int) -> tf.Tensor:
-                return tf.zeros([2, size])
-            self.cell.build_with_input(tf.nest.map_structure(lambda x: x[:, 0], input),
-                                       tf.nest.map_structure(zero_state, self.cell.state_size))
+            self.cell.build_with_input(tf.nest.map_structure(lambda x: x[:, 0], input))
         self.built_with_input = True
 
     def build(self, input_shape: tf.TensorShape) -> None:
@@ -141,7 +149,11 @@ class RNN(AutoShapeMixin, layers.RNN):
 
 
 class AbstractRNNCell(AutoShapeMixin, layers.AbstractRNNCell):
-    pass
+    def build_with_input(self, input: Union[Nested[tf.TensorSpec], Nested[tf.Tensor]], *args: Any, **kwargs: Any) -> None:
+        def zero_state(size: int) -> tf.Tensor:
+            return tf.zeros([self.min_batch_shape[0], size])
+        super().build_with_input(input, tf.nest.map_structure(zero_state, self.state_size))
+        self.built_with_input = True
 
 
 class GRUCell(AutoShapeMixin, layers.GRUCell):
