@@ -32,7 +32,7 @@ class MPCAgent(Agent):
         self._encoder = model.encoder
         self._objective_decoder = model.decoders[objective]
         self._state = tuple(tf.Variable(x) for x in self._predictor.zero_state(1, tf.float32))
-        self._planner = planner(self._predictor, self._objective_fn, self._action_space)
+        self._planner = planner.from_rnn(model.rnn, self._objective_fn, self._action_space)
         self._exploration_noise = exploration_noise
 
     def _objective_fn(self, state: Tuple[tf.Tensor, ...]) -> tf.Tensor:
@@ -66,7 +66,7 @@ class MPCAgent(Agent):
 
     @tf.function
     def act(self) -> tf.Tensor:
-        plan = self._planner(self.state)
+        plan, _ = self._planner(self.state)
         action = plan[0, :]
         if self._exploration_noise:
             action += tf.random.normal(action.shape, stddev=self._exploration_noise)
