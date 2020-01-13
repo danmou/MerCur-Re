@@ -140,7 +140,7 @@ class Model(auto_shape.Model):
             target = targets[name]
             scale = scales[name]
             loss = mse(reconstruction, target, mask, name=f'{name}_reconstruction_loss')
-            self.add_metric(loss, aggregation='mean', name=f'{name}_reconstruction')
+            self.add_metric(loss, aggregation='mean', name=f'{name}_recon')
             total += scale * loss
         return total
 
