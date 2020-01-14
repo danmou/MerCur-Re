@@ -17,3 +17,7 @@ def apply_mask(loss: tf.Tensor, mask: Optional[tf.Tensor], name: Optional[str] =
 
 def mse(pred: tf.Tensor, true: tf.Tensor, mask: Optional[tf.Tensor] = None, name: Optional[str] = None) -> tf.Tensor:
     return apply_mask(tf.math.squared_difference(pred, true), mask, name=name)
+
+
+def kl_divergence(mean: tf.Tensor, log_var: tf.Tensor, mask: Optional[tf.Tensor] = None, name: Optional[str] = None) -> tf.Tensor:
+    return apply_mask(-0.5 * tf.reduce_sum(1 + log_var - mean**2 - tf.exp(log_var), 1), mask, name=name)

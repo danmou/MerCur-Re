@@ -74,3 +74,40 @@ def trace_profile(writer: tf.summary.SummaryWriter) -> Generator[None, None, Non
     yield
     with writer.as_default():
         tf.summary.trace_export(name="profile", step=0)
+
+
+def map_fn(fn: Callable,
+           *args: Nested[tf.Tensor],
+           axis: int = 0,
+           vectorized: bool = False,
+           **kwargs: Any,
+           ) -> Nested[tf.Tensor]:
+    """
+    Improved version of tf.map_fn and tf.vectorized_map that allows using a function that take multiple args
+    and vectorizing over any axis
+    """
+    assert axis >= 0, 'Axis to map_fn must be non-negative'
+    perm_in = [axis] + list(range(axis))  # e.g. [2, 0, 1]
+    perm_out = list(range(1, axis + 1)) + [0]  # e.g. [1, 2, 0]
+    args_transposed = tf.nest.map_structure(lambda x: tf.transpose(x, perm_in + list(range(axis + 1, x.shape.ndims))),
+                                            args)
+    output_transposed = (tf.vectorized_map if vectorized else tf.map_fn)(lambda a: fn(*a), args_transposed, **kwargs)
+    return tf.nest.map_structure(lambda x: tf.transpose(x, perm_out + list(range(axis + 1, x.shape.ndims))),
+                                 output_transposed)
+
+
+def sliding_window(tensor: tf.Tensor, size: int, axis: int = 0) -> tf.Tensor:
+    """
+    Expand the specified axis of size N into two axes of size (N - size + 1, size), with element (..., i, j, ...) corresponding to
+    element (..., i+j, ...) in the original tensor.
+
+    Examples:
+        sliding_window(tf.constant([1, 2, 3, 4, 5]), 3) == tf.constant([[1, 2, 3], [2, 3, 4], [3, 4, 5]])
+        sliding_window(tf.ones(shape=[13, 14, 15, 16]), 4, axis=2).shape == [13, 14, 12, 4, 16]
+    """
+    def window_fn(i: tf.Tensor) -> tf.Tensor:
+        return tf.gather(tensor, tf.range(i, i + size), axis=axis)
+    res = tf.map_fn(window_fn, tf.range(tensor.shape[axis] - size + 1), dtype=tensor.dtype)
+    reshaped = tf.transpose(res, perm=list(range(1, axis + 1)) + [0] + list(range(axis + 1, res.shape.ndims)))
+    correct_shape = tensor.shape[:axis] + [tensor.shape[axis] - size + 1, size] + tensor.shape[axis + 1:]
+    return tf.ensure_shape(reshaped, correct_shape)
