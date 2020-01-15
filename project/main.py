@@ -119,6 +119,7 @@ class Main:
     def evaluate(self,
                  num_episodes: int = 10,
                  video: bool = True,
+                 visualize_planner: bool = False,
                  seed: Optional[int] = None,
                  no_sync: bool = False,
                  ) -> None:
@@ -130,6 +131,7 @@ class Main:
                      checkpoint=self.checkpoint,
                      num_episodes=num_episodes,
                      video=video,
+                     visualize_planner=visualize_planner,
                      seed=seed,
                      sync_wandb=wandb.run.resumed and not no_sync)
 

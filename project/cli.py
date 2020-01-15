@@ -96,6 +96,7 @@ def train_command(config: str,
 @with_global_options
 @click.option('-n', '--num-episodes', type=int, default=10, help='Number of episodes to evaluate on')
 @click.option('--no-video', is_flag=True, help='Disable video generation for faster evaluation')
+@click.option('--visualize-planner', is_flag=True, help='Generate plots to visualize CEM planning process')
 @click.option('--seed', type=int, help='Set seed for random values (this will also disable parallelization of loops)')
 @click.option('--no-sync', is_flag=True, help="Don't upload results to W&B")
 def evaluate_command(config: str,
@@ -107,6 +108,7 @@ def evaluate_command(config: str,
                      wandb_run: Optional[str],
                      num_episodes: int,
                      no_video: bool,
+                     visualize_planner: bool,
                      seed: Optional[int],
                      no_sync: bool,
                      ) -> None:
@@ -121,4 +123,4 @@ def evaluate_command(config: str,
                         data=data,
                         job_type='eval',
                         wandb_continue=wandb_run) as main:
-        main.evaluate(num_episodes, not no_video, seed, no_sync)
+        main.evaluate(num_episodes, not no_video, visualize_planner, seed, no_sync)

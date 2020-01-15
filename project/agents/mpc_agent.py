@@ -26,6 +26,7 @@ class MPCAgent(Agent):
                  objective: str = 'reward',
                  planner: Type[Planner] = gin.REQUIRED,
                  exploration_noise: float = 0.0,
+                 visualize: bool = False,
                  ) -> None:
         super().__init__(action_space)
         self._predictor = model.rnn.predictor
@@ -34,6 +35,8 @@ class MPCAgent(Agent):
         self._state = tuple(tf.Variable(x) for x in self._predictor.zero_state(1, tf.float32))
         self._planner = planner.from_rnn(model.rnn, self._objective_fn, self._action_space)
         self._exploration_noise = exploration_noise
+        self._goal = tf.Variable([0.0, 0.0])
+        self._visualize = tf.Variable(visualize)
 
     def _objective_fn(self, state: Tuple[tf.Tensor, ...]) -> tf.Tensor:
         obj = self._objective_decoder(self._predictor.state_to_features(state))
@@ -59,6 +62,7 @@ class MPCAgent(Agent):
     def observe(self, observations: Observations, action: Optional[tf.Tensor]) -> None:
         if action is None:
             action = tf.zeros_like(self._action_space.low)
+        self._goal.assign(observations['goal'])
         observations = tf.nest.map_structure(lambda t: t[tf.newaxis, tf.newaxis, :], observations)
         embedded = self._encoder(observations)[0]
         action = action[tf.newaxis, :]
@@ -66,7 +70,11 @@ class MPCAgent(Agent):
 
     @tf.function
     def act(self) -> tf.Tensor:
-        plan, _ = self._planner(self.state)
+        if self._visualize:
+            plan, _ = self._planner(self.state, visualization_goal=self._goal)
+        else:
+            plan, _ = self._planner(self.state)
+        self._visualize.assign(False)
         action = plan[0, :]
         if self._exploration_noise:
             action += tf.random.normal(action.shape, stddev=self._exploration_noise)

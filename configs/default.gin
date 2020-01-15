@@ -91,6 +91,7 @@ Habitat.task = 'pointnav'
 # Habitat.dataset = 'habitat_test'
 Habitat.dataset = 'habitat_test_castle'
 # Habitat.dataset = 'habitat_test_single'
+# Habitat.dataset = 'habitat_test_short'
 Habitat.gpu_id = 0
 Habitat.image_key = 'rgb'
 Habitat.goal_key = 'pointgoal_with_gps_compass'

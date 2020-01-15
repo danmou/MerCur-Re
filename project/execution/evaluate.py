@@ -34,6 +34,7 @@ def evaluate(logdir: Path,
              model: Optional[Model] = None,
              num_episodes: int = 10,
              video: bool = True,
+             visualize_planner: bool = False,
              seed: Optional[int] = None,
              sync_wandb: bool = True,
              existing_env: Optional[VectorHabitat] = None,
@@ -71,7 +72,7 @@ def evaluate(logdir: Path,
         if model is None:
             assert checkpoint is not None
             model, _ = restore_model(checkpoint, logdir)
-        agent = MPCAgent(env.action_space, model, objective='reward')
+        agent = MPCAgent(env.action_space, model, objective='reward', visualize=visualize_planner)
         mean_metrics = sim.run(agent, num_episodes, log=True)
 
     videos = [wandb.Video(str(vid), fps=10, format="mp4") for vid in save_dir.glob('*.mp4')] if video else None

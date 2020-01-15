@@ -33,5 +33,6 @@ class Planner(abc.ABC):
                  initial_state: Tuple[Union[tf.Tensor, tf.Variable], ...],
                  initial_mean: Optional[tf.Tensor] = None,
                  initial_std_dev: Optional[tf.Tensor] = None,
+                 visualization_goal: Optional[tf.Tensor] = None,
                  ) -> Tuple[tf.Tensor, tf.Tensor]:
         raise NotImplementedError
