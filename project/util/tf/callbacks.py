@@ -55,7 +55,7 @@ class DataCollectionCallback(callbacks.Callback):
         self._test_episodes = test_episodes
 
     def on_epoch_end(self, epoch: int, logs: Any = None) -> None:
-        if (epoch + 1) % self._period == 0:
+        if self._period and (epoch + 1) % self._period == 0:
             for task, sims in self._sims.items():
                 metrics = []
                 for phase, episodes in [('train', self._train_episodes), ('test', self._test_episodes)]:
@@ -82,7 +82,7 @@ class EvaluateCallback(callbacks.Callback):
         self._num_episodes = num_episodes
 
     def on_epoch_end(self, epoch: int, logs: Any = None) -> None:
-        if (epoch + 1) % self._period == 0:
+        if self._period and (epoch + 1) % self._period == 0:
             metrics, videos = evaluate(logdir=self._logdir,
                                        model=self._model,
                                        num_episodes=self._num_episodes,
@@ -129,9 +129,9 @@ class LoggingCallback(callbacks.Callback):
         if self._batch_statistics is None:
             self._batch_statistics = Statistics(keys)
         self._batch_statistics.update(logs)
-        if batch % self._batch_header_period == 0:
+        if self._batch_header_period and batch % self._batch_header_period == 0:
             self._batch_printer.print_header()
-        if log_batch % self._batch_log_period == 0:
+        if self._batch_log_period and log_batch % self._batch_log_period == 0:
             row = self._batch_statistics.mean
             row['batch'] = log_batch
             self._batch_printer.print_row(row)
@@ -148,9 +148,9 @@ class LoggingCallback(callbacks.Callback):
         if self._epoch_statistics is None:
             self._epoch_statistics = Statistics(logs.keys())
         self._epoch_statistics.update(logs)
-        if epoch % self._epoch_header_period == 0:
+        if self._epoch_header_period and epoch % self._epoch_header_period == 0:
             self._epoch_printer.print_header()
-        if log_epoch % self._epoch_log_period == 0:
+        if self._epoch_log_period and log_epoch % self._epoch_log_period == 0:
             row: MutableMapping[str, Union[str, SupportsFloat]] = self._epoch_statistics.mean  # type: ignore[assignment]  # mypy/issues/8136
             row['epoch'] = log_epoch
             row['phase'] = 'train'
@@ -250,7 +250,7 @@ class PredictionSummariesCallback(callbacks.Callback):
         return summaries
 
     def on_epoch_end(self, epoch: int, logs: Mapping[str, SupportsFloat] = None) -> None:
-        if (epoch + 1) % self._period == 0:
+        if self._period and (epoch + 1) % self._period == 0:
             plt.close('all')
             for name in self._episodes.keys():
                 episode = self._episodes[name]
