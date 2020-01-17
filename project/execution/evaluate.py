@@ -16,7 +16,7 @@ import tensorflow as tf
 import wandb
 from loguru import logger
 
-from project.agents import MPCAgent
+from project.agents import ConstantAgent, MPCAgent, RandomAgent
 from project.environments import wrappers
 from project.environments.habitat import VectorHabitat
 from project.model import Model, restore_model
@@ -31,6 +31,7 @@ from .simulator import Simulator
 @measure_time
 def evaluate(logdir: Path,
              checkpoint: Optional[Path] = None,
+             baseline: Optional[str] = None,
              model: Optional[Model] = None,
              num_episodes: int = 10,
              video: bool = True,
@@ -40,7 +41,7 @@ def evaluate(logdir: Path,
              existing_env: Optional[VectorHabitat] = None,
              ) -> Tuple[Dict[str, float], Optional[List[wandb.Video]]]:
     """Evaluate trained model in a Habitat environment."""
-    assert [checkpoint, model].count(None) == 1, 'Exactly one of checkpoint and model must be provided'
+    assert [checkpoint, baseline, model].count(None) == 2, 'Exactly one of checkpoint, baseline and model must be provided'
     if seed is not None:
         # TODO: Make deterministic mode work again
         random.seed(seed)
@@ -69,10 +70,18 @@ def evaluate(logdir: Path,
     else:
         distribute_scope = contextlib.nullcontext()
     with distribute_scope:
-        if model is None:
-            assert checkpoint is not None
-            model, _ = restore_model(checkpoint, logdir)
-        agent = MPCAgent(env.action_space, model, objective='reward', visualize=visualize_planner)
+        if baseline is None:
+            if model is None:
+                assert checkpoint is not None
+                model, _ = restore_model(checkpoint, logdir)
+            agent = MPCAgent(env.action_space, model, objective='reward', visualize=visualize_planner)
+        else:
+            if baseline == 'random':
+                agent = RandomAgent(env.action_space)
+            elif baseline == 'straight':
+                agent = ConstantAgent(env.action_space, value=tf.constant([0.0]))
+            else:
+                raise RuntimeError(f'Unknown baseline {baseline}')
         mean_metrics = sim.run(agent, num_episodes, log=True)
 
     videos = [wandb.Video(str(vid), fps=10, format="mp4") for vid in save_dir.glob('*.mp4')] if video else None

@@ -122,13 +122,15 @@ class Main:
                  visualize_planner: bool = False,
                  seed: Optional[int] = None,
                  no_sync: bool = False,
+                 baseline: Optional[str] = None,
                  ) -> None:
         if not self.checkpoint and wandb.run.resumed:
             self.checkpoint = self.logdir
-        assert self.checkpoint is not None, 'No checkpoint specified!'
+        assert baseline is not None or self.checkpoint is not None, 'No checkpoint specified!'
         with self._catch():
             evaluate(logdir=self.logdir,
                      checkpoint=self.checkpoint,
+                     baseline=baseline,
                      num_episodes=num_episodes,
                      video=video,
                      visualize_planner=visualize_planner,

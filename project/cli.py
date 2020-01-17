@@ -99,6 +99,8 @@ def train_command(config: str,
 @click.option('--visualize-planner', is_flag=True, help='Generate plots to visualize CEM planning process')
 @click.option('--seed', type=int, help='Set seed for random values (this will also disable parallelization of loops)')
 @click.option('--no-sync', is_flag=True, help="Don't upload results to W&B")
+@click.option('-b', '--baseline', type=click.Choice(['random', 'straight']), help='Evaluate a trivial baseline agent '
+                                                                                  'instead of a trained model')
 def evaluate_command(config: str,
                      data: Optional[str],
                      verbosity: str,
@@ -111,6 +113,7 @@ def evaluate_command(config: str,
                      visualize_planner: bool,
                      seed: Optional[int],
                      no_sync: bool,
+                     baseline: Optional[str],
                      ) -> None:
     """Evaluate checkpoint."""
     if not wandb_run:
@@ -123,4 +126,4 @@ def evaluate_command(config: str,
                         data=data,
                         job_type='eval',
                         wandb_continue=wandb_run) as main:
-        main.evaluate(num_episodes, not no_video, visualize_planner, seed, no_sync)
+        main.evaluate(num_episodes, not no_video, visualize_planner, seed, no_sync, baseline)
