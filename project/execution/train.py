@@ -19,7 +19,8 @@ from project.util.tf.callbacks import (CheckpointCallback,
                                        DataCollectionCallback,
                                        EvaluateCallback,
                                        LoggingCallback,
-                                       PredictionSummariesCallback)
+                                       PredictionSummariesCallback,
+                                       WandbCommitCallback)
 from project.util.timing import measure_time
 
 from .simulator import Simulator
@@ -94,6 +95,7 @@ def train(logdir: Path,
             DataCollectionCallback(sims, agents),
             PredictionSummariesCallback(model, dataset_dirs),
             EvaluateCallback(logdir, model, envs),
+            WandbCommitCallback(),
         ]
         measure_time(model.fit)(train_data,
                                 validation_data=test_data,

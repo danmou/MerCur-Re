@@ -174,6 +174,12 @@ class LoggingCallback(callbacks.Callback):
         wandb.log(wandb_row, step=epoch)
 
 
+class WandbCommitCallback(callbacks.Callback):
+    """Simply makes wandb upload the metrics immediately at the end of the epoch. This callback should be last."""
+    def on_epoch_end(self, epoch: int, logs: Optional[Mapping[str, SupportsFloat]] = None) -> None:
+        wandb.log()
+
+
 Episode = Dict[str, tf.Tensor]
 
 
