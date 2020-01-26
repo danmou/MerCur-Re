@@ -183,6 +183,7 @@ class Habitat(habitat.RLEnv):
             metrics['remaining_distance'] = dist_dict['distance_to_target']
         if 'collisions' in metrics:
             metrics['collisions'] = metrics['collisions']['count']
+        metrics['scene'] = self.habitat_env.current_episode.scene_id
         return metrics
 
     def step(self, action: Union[np.ndarray, float]) -> ObsTuple:  # type: ignore[override]

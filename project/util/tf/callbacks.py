@@ -51,17 +51,23 @@ class DataCollectionCallback(callbacks.Callback):
         self._sims = sims
         self._agents = agents
         self._period = period
-        self._train_episodes = train_episodes
-        self._test_episodes = test_episodes
+        self._num_episodes = {'train': train_episodes, 'test': test_episodes}
 
     def on_epoch_end(self, epoch: int, logs: Any = None) -> None:
         if self._period and (epoch + 1) % self._period == 0:
             for task, sims in self._sims.items():
-                metrics = []
-                for phase, episodes in [('train', self._train_episodes), ('test', self._test_episodes)]:
+                mean_metrics = {}
+                total_episodes = 0
+                for phase, episodes in self._num_episodes.items():
                     logger.info(f'Collecting {episodes} on-policy episodes ({task} {phase}).')
-                    metrics.append(sims[phase].run(self._agents[task], episodes))
-                wandb.log({f'{task}/train/{k}': (metrics[0][k] + metrics[1][k]) / 2 for k in metrics[0].keys()}, step=epoch)
+                    sim = sims[phase]
+                    metrics = sim.run(self._agents[task], episodes)
+                    mean_metrics = {k: mean_metrics.get(k, 0) + episodes * v for k, v in metrics.items()}
+                    total_episodes += episodes
+                    wandb.log({f'{task}/{phase}/steps_seen': sim.steps_seen,
+                               f'{task}/{phase}/scenes_seen': sim.scenes_seen}, step=epoch)
+                mean_metrics = {k: v / total_episodes for k, v in mean_metrics.items()}
+                wandb.log({f'{task}/train/{k}': v for k, v in mean_metrics.items()}, step=epoch)
 
 
 @gin.configurable(whitelist=['period', 'num_episodes'])

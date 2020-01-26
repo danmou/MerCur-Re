@@ -42,6 +42,8 @@ class Simulator:
             self._env = env
         self._observation_dtypes = self._parse_dtype(env.observation_space)
         self._metrics = list(metrics) if metrics else []
+        self._seen_scenes = set()
+        self._steps_seen = 0
         self._save_video = save_video
 
     @property
@@ -51,6 +53,14 @@ class Simulator:
     @property
     def observation_space(self) -> gym.Space:
         return self._env.observation_space
+
+    @property
+    def steps_seen(self) -> int:
+        return self._steps_seen
+
+    @property
+    def scenes_seen(self) -> int:
+        return len(self._seen_scenes)
 
     def run(self, agent: Agent, num_episodes: int = 1, log: bool = False) -> Dict[str, float]:
         """
@@ -112,6 +122,9 @@ class Simulator:
         obs = self._select_obs(obs)
         reward = np.float32(reward)
         metrics = {k: info[k] for k in self._metrics}
+        self._steps_seen += 1
+        if 'scene' in info:
+            self._seen_scenes.add(info['scene'])
         obs, metrics = tf.nest.map_structure(lambda x: np.float32(x), (obs, metrics))
         return obs, reward, done, metrics
 
