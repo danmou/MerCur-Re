@@ -356,26 +356,41 @@ class VectorHabitat(VectorEnv):
             pass
 
 
-@gin.configurable('Habitat', whitelist=['task', 'dataset', 'gpu_id', 'image_key', 'goal_key', 'reward_function'])
-def get_config(max_steps: Optional[Union[int, float]] = None,
+@gin.configurable('Habitat', whitelist=['task', 'train_dataset', 'train_split', 'eval_dataset', 'eval_split', 'gpu_id',
+                                        'image_key', 'goal_key', 'reward_function'])
+def get_config(training: bool = False,
+               top_down_map: bool = False,
+               max_steps: Optional[Union[int, float]] = None,
                task: str = 'pointnav',
-               dataset: str = 'habitat_test',
+               train_dataset: str = 'habitat_test',
+               train_split: str = 'train',
+               eval_dataset: str = 'habitat_test',
+               eval_split: str = 'val',
                gpu_id: int = 0,
                image_key: str = 'rgb',
                goal_key: str = 'pointgoal_with_gps_compass',
                reward_function: RewardFunction = gin.REQUIRED,
                ) -> Dict[str, Any]:
+    mode = 'train' if training else 'eval'
+    dataset = train_dataset if training else eval_dataset
+    split = train_split if training else eval_split
     opts = ['SIMULATOR.HABITAT_SIM_V0.GPU_DEVICE_ID', gpu_id]
     if max_steps:
         opts += ['ENVIRONMENT.MAX_EPISODE_STEPS', int(max_steps)]
+    opts += ['DATASET.SPLIT', split]
+    if not training:
+        opts += ['ENVIRONMENT.ITERATOR_OPTIONS.SHUFFLE', False]
+        opts += ['ENVIRONMENT.ITERATOR_OPTIONS.MAX_SCENE_REPEAT_EPISODES', 3]
     if not task.endswith('.yaml'):
         task = f'{get_config_dir()}/habitat/tasks/{task}.yaml'
     if not dataset.endswith('.yaml'):
         dataset = f'{get_config_dir()}/habitat/datasets/{dataset}.yaml'
-    copyfile(task, Path(wandb.run.dir) / 'task.yaml')
-    copyfile(dataset, Path(wandb.run.dir) / 'dataset.yaml')
-    wandb.save(f'{wandb.run.dir}/task.yaml')
-    wandb.save(f'{wandb.run.dir}/dataset.yaml')
+    task_file = Path(wandb.run.dir) / 'task.yaml'
+    dataset_file = Path(wandb.run.dir) / f'{mode}_dataset.yaml'
+    copyfile(task, task_file)
+    copyfile(dataset, dataset_file)
+    wandb.save(str(task_file))
+    wandb.save(str(dataset_file))
     if not HabitatSimActions.has_action('TURN_ANGLE'):
         HabitatSimActions.extend_action_space('TURN_ANGLE')
     config = habitat.get_config([task, dataset], opts)
@@ -387,5 +402,8 @@ def get_config(max_steps: Optional[Union[int, float]] = None,
     config.TASK.ACTIONS.TURN_ANGLE = habitat.Config()
     config.TASK.ACTIONS.TURN_ANGLE.TYPE = 'TurnAngleAction'
     config.TASK.POSSIBLE_ACTIONS = ['STOP', 'MOVE_FORWARD', 'TURN_ANGLE']
+    if top_down_map and 'TOP_DOWN_MAP' not in config.TASK.MEASUREMENTS:
+        # Top-down map is expensive to compute, so we only enable it when needed.
+        config.TASK.MEASUREMENTS.append('TOP_DOWN_MAP')
     config.freeze()
     return {'config': config, 'image_key': image_key, 'goal_key': goal_key, 'reward_function': reward_function}

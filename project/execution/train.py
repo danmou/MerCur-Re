@@ -23,6 +23,7 @@ from project.util.tf.callbacks import (CheckpointCallback,
                                        WandbCommitCallback)
 from project.util.timing import measure_time
 
+from .evaluator import Evaluator
 from .simulator import Simulator
 
 
@@ -39,16 +40,9 @@ def train(logdir: Path,
           test_steps: int = gin.REQUIRED,
           batch_shape: Tuple[int, int] = (64, 64),
           ) -> None:
-    logger.info('Creating environments.')
-    envs = {}
-    sims = {}
-    for task in tasks:
-        envs[task.name] = task.env_ctor()
-        sims[task.name] = {phase: Simulator(envs[task.name],
-                                            metrics=task.metrics,
-                                            save_dir=logdir / f'{phase}_episodes',
-                                            save_data=True)
-                           for phase in ['train', 'test']}
+    logger.info('Creating training environments.')
+    sims = {task.name: Simulator(task) for task in tasks}
+    evaluator = Evaluator(logdir=logdir, video=True)
 
     distribution_strategy = get_distribution_strategy()
     batch_shape = (distribution_strategy.num_replicas_in_sync * batch_shape[0], batch_shape[1])
@@ -59,10 +53,10 @@ def train(logdir: Path,
         for dataset in dataset_dirs.values():
             link_directory_contents(Path(initial_data).absolute() / dataset.name, dataset)
     else:
-        for task, task_sims in sims.items():
-            for phase, sim in task_sims.items():
+        for task, sim in sims.items():
+            for phase, save_dir in dataset_dirs.items():
                 logger.info(f'Collecting {num_seed_episodes} initial episodes ({task} {phase}).')
-                sim.run(RandomAgent(sim.action_space), num_seed_episodes)
+                sim.run(RandomAgent(sim.action_space), num_seed_episodes, save_dir=save_dir, save_data=True)
 
     with distribution_strategy.scope():
         train_data, test_data = numpy_episodes(dataset_dirs['train'], dataset_dirs['test'], batch_shape)
@@ -79,7 +73,7 @@ def train(logdir: Path,
         # model.encoder.layer.layer._image_enc.summary(line_length=100, print_fn=logger.debug)
         # model.decoders['image'].layer._decoder.summary(line_length=100, print_fn=logger.debug)
 
-        agents = {task_name: MPCAgent(env.action_space, model, objective='reward') for task_name, env in envs.items()}
+        agents = {task_name: MPCAgent(sim.action_space, model, objective='reward') for task_name, sim in sims.items()}
 
         logger.info('Training...')
         callbacks = [
@@ -92,9 +86,9 @@ def train(logdir: Path,
                                            update_freq='epoch'),
             CheckpointCallback(filepath=str(logdir / 'checkpoint_epoch_{epoch:03d}_loss_{val_loss:.2f}.h5'),
                                verbose=1),
-            DataCollectionCallback(sims, agents),
+            DataCollectionCallback(sims, agents, dataset_dirs),
+            EvaluateCallback(evaluator, agents),
             PredictionSummariesCallback(model, dataset_dirs),
-            EvaluateCallback(logdir, agents, envs),
             WandbCommitCallback(),
         ]
         measure_time(model.fit)(train_data,

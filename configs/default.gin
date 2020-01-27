@@ -3,7 +3,8 @@ logging.module_levels = {'matplotlib': 'WARNING', 'PIL': 'WARNING', 'imageio_ffm
 
 ### Planet ###
 # Task
-training.tasks = [@habitat_task()]
+training.tasks = [@habitat_train_task()]
+evaluation.tasks = [@habitat_eval_task()]
 
 # Data preprocessing
 numpy_episodes.train_action_noise = 0.3
@@ -90,18 +91,27 @@ tf.gpus.gpu_ids = [0]
 
 ### Habitat ###
 # Basic
-habitat_task.max_length = 150  # Maximum sequence length
-habitat_task.wrappers = [@curriculum(),
-                         @action_repeat()]
+habitat_train_task.max_length = 150  # Maximum sequence length
+habitat_train_task.wrappers = [@curriculum(), @action_repeat()]
+habitat_eval_task.max_length = 150   # Maximum sequence length
+habitat_eval_task.wrappers = [@action_repeat()]
 curriculum.enabled = False
 curriculum.start_threshold = 1.5  # Initial threshold in meters.
 curriculum.initial_delay = 200  # Number of episodes to wait before increasing threshold.
 curriculum.increase_rate = 0.05  # Rate of increase in meters per episode.
 Habitat.task = 'pointnav'
-# Habitat.dataset = 'habitat_test'
-Habitat.dataset = 'habitat_test_castle'
-# Habitat.dataset = 'habitat_test_single'
-# Habitat.dataset = 'habitat_test_short'
+# Habitat.train_dataset = 'habitat_test'
+# Habitat.eval_dataset = 'habitat_test'
+Habitat.train_dataset = 'habitat_test_castle'
+Habitat.eval_dataset = 'habitat_test_castle'
+# Habitat.train_dataset = 'habitat_test_single'
+# Habitat.eval_dataset = 'habitat_test_single'
+# Habitat.train_dataset = 'habitat_test_short'
+# Habitat.eval_dataset = 'habitat_test_short'
+# Habitat.train_dataset = 'gibson'
+# Habitat.eval_dataset = 'gibson'
+Habitat.train_split = 'train'
+Habitat.eval_split = 'val_mini'
 Habitat.gpu_id = 0
 Habitat.image_key = 'rgb'
 Habitat.goal_key = 'pointgoal_with_gps_compass'

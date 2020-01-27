@@ -17,7 +17,7 @@ import wandb.settings
 from loguru import logger
 from tensorflow.python.util import deprecation
 
-from project.execution import evaluate, train
+from project.execution import Evaluator, train
 from project.util.logging import init_logging
 
 
@@ -128,14 +128,12 @@ class Main:
             self.checkpoint = self.logdir
         assert baseline is not None or self.checkpoint is not None, 'No checkpoint specified!'
         with self._catch():
-            evaluate(logdir=self.logdir,
-                     checkpoint=self.checkpoint,
-                     baseline=baseline,
-                     num_episodes=num_episodes,
-                     video=video,
-                     visualize_planner=visualize_planner,
-                     seed=seed,
-                     sync_wandb=wandb.run.resumed and not no_sync)
+            Evaluator(logdir=self.logdir, video=video).evaluate(checkpoint=self.checkpoint,
+                                                                baseline=baseline,
+                                                                num_episodes=num_episodes,
+                                                                visualize_planner=visualize_planner,
+                                                                seed=seed,
+                                                                sync_wandb=wandb.run.resumed and not no_sync)
 
 
 @contextlib.contextmanager

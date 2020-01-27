@@ -5,10 +5,9 @@
 import time
 from functools import partial
 from pathlib import Path
-from typing import Any, Dict, Mapping, MutableMapping, Optional, SupportsFloat, Tuple, Union, cast
+from typing import Any, Dict, Mapping, MutableMapping, Optional, SupportsFloat, Tuple, Union
 
 import gin
-import gym
 import matplotlib.pyplot as plt
 import tensorflow as tf
 import wandb
@@ -16,9 +15,7 @@ from loguru import logger
 from tensorflow.keras import callbacks
 
 from project.agents import Agent
-from project.environments.habitat import VectorHabitat
-from project.execution.evaluate import evaluate
-from project.execution.simulator import Simulator
+from project.execution import Evaluator, Simulator
 from project.model import Model
 from project.util import PrettyPrinter, Statistics
 from project.util.planet.numpy_episodes import episode_reader
@@ -41,8 +38,9 @@ class CheckpointCallback(callbacks.ModelCheckpoint):
 class DataCollectionCallback(callbacks.Callback):
     """Collects new data between epochs using current model"""
     def __init__(self,
-                 sims: Mapping[str, Mapping[str, Simulator]],
+                 sims: Mapping[str, Simulator],
                  agents: Mapping[str, Agent],
+                 dirs: Mapping[str, Path],
                  period: int = 1,
                  train_episodes: int = 1,
                  test_episodes: int = 1,
@@ -50,22 +48,28 @@ class DataCollectionCallback(callbacks.Callback):
         super().__init__()
         self._sims = sims
         self._agents = agents
+        self._dirs = dirs
         self._period = period
         self._num_episodes = {'train': train_episodes, 'test': test_episodes}
 
     def on_epoch_end(self, epoch: int, logs: Any = None) -> None:
         if self._period and (epoch + 1) % self._period == 0:
-            for task, sims in self._sims.items():
-                mean_metrics = {}
+            for task, sim in self._sims.items():
+                mean_metrics: Mapping[str, float] = {}
                 total_episodes = 0
                 for phase, episodes in self._num_episodes.items():
                     logger.info(f'Collecting {episodes} on-policy episodes ({task} {phase}).')
-                    sim = sims[phase]
-                    metrics = sim.run(self._agents[task], episodes)
+                    count_seen = phase == 'train'
+                    metrics = sim.run(self._agents[task],
+                                      episodes,
+                                      save_dir=self._dirs[phase],
+                                      save_data=True,
+                                      count=count_seen)
                     mean_metrics = {k: mean_metrics.get(k, 0) + episodes * v for k, v in metrics.items()}
                     total_episodes += episodes
-                    wandb.log({f'{task}/{phase}/steps_seen': sim.steps_seen,
-                               f'{task}/{phase}/scenes_seen': sim.scenes_seen}, step=epoch)
+                    if count_seen:
+                        wandb.log({f'{task}/{phase}/steps_seen': sim.steps_seen,
+                                   f'{task}/{phase}/scenes_seen': sim.scenes_seen}, step=epoch)
                 mean_metrics = {k: v / total_episodes for k, v in mean_metrics.items()}
                 wandb.log({f'{task}/train/{k}': v for k, v in mean_metrics.items()}, step=epoch)
 
@@ -74,30 +78,32 @@ class DataCollectionCallback(callbacks.Callback):
 class EvaluateCallback(callbacks.Callback):
     """Evaluates current model"""
     def __init__(self,
-                 logdir: Path,
+                 evaluator: Evaluator,
                  agents: Mapping[str, Agent],
-                 envs: Mapping[str, gym.Env],
                  period: int = 10,
                  num_episodes: int = 10,
                  ) -> None:
         super().__init__()
-        self._logdir = logdir
+        self._evaluator = evaluator
         self._agents = agents
-        self._envs = envs
         self._period = period
         self._num_episodes = num_episodes
 
     def on_epoch_end(self, epoch: int, logs: Any = None) -> None:
         if self._period and (epoch + 1) % self._period == 0:
-            metrics, videos = evaluate(logdir=self._logdir,
-                                       agent=self._agents['habitat'],
-                                       num_episodes=self._num_episodes,
-                                       video=True,
-                                       seed=None,
-                                       sync_wandb=True,
-                                       existing_env=cast(VectorHabitat, self._envs['habitat']))
-            wandb.log({f'habitat/eval/{k}': v for k, v in metrics.items()}, step=epoch)
-            wandb.log({f'habitat/eval/video_{i}': v for i, v in enumerate(videos)}, step=epoch)
+            metrics, videos = self._evaluator.evaluate(agents=self._agents,
+                                                       num_episodes=self._num_episodes,
+                                                       seed=None,
+                                                       sync_wandb=True)
+            wandb.log({f'{task}/eval/{k}': v
+                       for task, task_metrics in metrics.items()
+                       for k, v in task_metrics.items()},
+                      step=epoch)
+            if videos:
+                wandb.log({f'{task}/eval/video_{i}': v
+                           for task, task_videos in videos.items()
+                           for i, v in enumerate(task_videos)},
+                          step=epoch)
 
 
 @gin.configurable(whitelist=['epoch_log_period', 'epoch_header_period', 'batch_log_period', 'batch_header_period'])

@@ -2,8 +2,8 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from .evaluate import evaluate
+from .evaluator import Evaluator
 from .simulator import Simulator
 from .train import train
 
-__all__ = ['evaluate', 'Simulator', 'train']
+__all__ = ['Evaluator', 'Simulator', 'train']

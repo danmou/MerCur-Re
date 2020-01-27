@@ -89,6 +89,9 @@ Extracting episodes from a specific environment and saving as new dataset:
 ```bash
 split=val; gzip -dc data/datasets/pointnav/habitat-test-scenes/v1/${split}/${split}.json.gz | jq '{episodes: [.episodes[] | select(.scene_id | contains("castle"))]}' | gzip > data/datasets/pointnav/habitat-test-scenes/v1/${split}/${split}_castle.json.gz
 ```
+```bash
+gzip -dc data/datasets/pointnav/habitat-test-scenes/v1/val/val.json.gz | jq '{episodes: [([.episodes[] | select(.scene_id | contains("castle")) | select(.episode_id | tonumber | . % 3 == 0)] | .[0:15])[], ([.episodes[] | select(.scene_id | contains("gogh")) | select(.episode_id | tonumber | . % 3 == 0)] | .[0:15])[]]}' | gzip > data/datasets/pointnav/habitat-test-scenes/v1/val_mini/val_mini.json.gz
+```
 Calculating 5th, 50th and 95th percentiles of geodesic distances:
 ```bash
 split=val; gzip -dc data/datasets/pointnav/gibson/v1/${split}/${split}.json.gz | jq '[.episodes[].info.geodesic_distance] | sort | .[length*(0.05, 0.5, 0.95) | round]'

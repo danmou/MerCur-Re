@@ -36,6 +36,8 @@ HierarchicalCrossEntropyMethod.top_k = 3
 tf.gpus.gpu_ids = [0]
 
 curriculum.enabled = False
-habitat_task.max_length = 10
-Habitat.dataset = 'habitat_test_single'
+habitat_train_task.max_length = 10
+habitat_eval_task.max_length = 10
+Habitat.train_dataset = 'habitat_test_single'
+Habitat.eval_dataset = 'habitat_test_single'
 Habitat.gpu_id = 0
