@@ -2,7 +2,7 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import Optional, Tuple, Type
+from typing import Optional, Tuple, Type, Union
 
 import gin
 import gym.spaces
@@ -21,13 +21,14 @@ class MPCAgent(Agent):
     actions and executes the first one.
     """
     def __init__(self,
-                 action_space: gym.spaces.box,
+                 action_space: gym.Space,
                  model: Model,
                  objective: str = 'reward',
                  planner: Type[Planner] = gin.REQUIRED,
                  exploration_noise: float = 0.0,
                  visualize: bool = False,
                  ) -> None:
+        assert isinstance(action_space, gym.spaces.Box), f'Unsupported action space {action_space}'
         super().__init__(action_space)
         self._predictor = model.rnn.predictor
         self._encoder = model.encoder
@@ -54,6 +55,15 @@ class MPCAgent(Agent):
         for s, v in zip(self._state, value):
             s.assign(v)
 
+    @property
+    def visualize(self) -> tf.Variable:
+        return self._visualize
+
+    @visualize.setter  # type: ignore[misc]  # mypy/issues/1362
+    @tf.function
+    def visualize(self, value: Union[tf.Tensor, bool]) -> None:
+        self._visualize.assign(value)
+
     @tf.function
     def reset(self) -> None:
         self.state = tuple(tf.zeros_like(s) for s in self.state)  # type: ignore[misc]  # mypy/issues/1362
@@ -66,15 +76,17 @@ class MPCAgent(Agent):
         observations = tf.nest.map_structure(lambda t: t[tf.newaxis, tf.newaxis, :], observations)
         embedded = self._encoder(observations)[0]
         action = action[tf.newaxis, :]
-        _, self.state = self._predictor((embedded, action, tf.constant([[True]])), self.state)  # type: ignore[misc]  # mypy/issues/1362
+        use_obs = tf.constant([[True]])
+        state = tuple(v.value() for v in self._state)  # This is needed to prevent weird errors with dead weakrefs
+        _, self.state = self._predictor((embedded, action, use_obs), state)  # type: ignore[misc]  # mypy/issues/1362
 
     @tf.function
     def act(self) -> tf.Tensor:
-        if self._visualize:
+        if self.visualize:
             plan, _ = self._planner(self.state, visualization_goal=self._goal)
         else:
             plan, _ = self._planner(self.state)
-        self._visualize.assign(False)
+        self.visualize = False  # type: ignore[misc]  # mypy/issues/1362
         action = plan[0, :]
         if self._exploration_noise:
             action += tf.random.normal(action.shape, stddev=self._exploration_noise)

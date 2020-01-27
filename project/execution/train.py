@@ -94,7 +94,7 @@ def train(logdir: Path,
                                verbose=1),
             DataCollectionCallback(sims, agents),
             PredictionSummariesCallback(model, dataset_dirs),
-            EvaluateCallback(logdir, model, envs),
+            EvaluateCallback(logdir, agents, envs),
             WandbCommitCallback(),
         ]
         measure_time(model.fit)(train_data,

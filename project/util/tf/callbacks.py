@@ -69,14 +69,14 @@ class EvaluateCallback(callbacks.Callback):
     """Evaluates current model"""
     def __init__(self,
                  logdir: Path,
-                 model: Model,
+                 agents: Mapping[str, Agent],
                  envs: Mapping[str, gym.Env],
                  period: int = 10,
                  num_episodes: int = 10,
                  ) -> None:
         super().__init__()
         self._logdir = logdir
-        self._model = model
+        self._agents = agents
         self._envs = envs
         self._period = period
         self._num_episodes = num_episodes
@@ -84,7 +84,7 @@ class EvaluateCallback(callbacks.Callback):
     def on_epoch_end(self, epoch: int, logs: Any = None) -> None:
         if self._period and (epoch + 1) % self._period == 0:
             metrics, videos = evaluate(logdir=self._logdir,
-                                       model=self._model,
+                                       agent=self._agents['habitat'],
                                        num_episodes=self._num_episodes,
                                        video=True,
                                        seed=None,

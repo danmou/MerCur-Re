@@ -81,8 +81,8 @@ def cross_entropy_method(initial_state: Tuple[Union[tf.Tensor, tf.Variable], ...
                          amount: int = 1000,
                          top_k: int = 100,
                          iterations: int = 10,
-                         mean: Optional[np.ndarray] = None,
-                         std_dev: Optional[np.ndarray] = None,
+                         mean: Optional[tf.Tensor] = None,
+                         std_dev: Optional[tf.Tensor] = None,
                          visualization_goal: Optional[tf.Tensor] = None,
                          ) -> Tuple[tf.Tensor, tf.Tensor]:
     """

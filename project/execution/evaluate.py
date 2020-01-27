@@ -16,7 +16,7 @@ import tensorflow as tf
 import wandb
 from loguru import logger
 
-from project.agents import ConstantAgent, MPCAgent, RandomAgent
+from project.agents import Agent, ConstantAgent, MPCAgent, RandomAgent
 from project.environments import wrappers
 from project.environments.habitat import VectorHabitat
 from project.model import Model, restore_model
@@ -32,7 +32,7 @@ from .simulator import Simulator
 def evaluate(logdir: Path,
              checkpoint: Optional[Path] = None,
              baseline: Optional[str] = None,
-             model: Optional[Model] = None,
+             agent: Optional[Agent] = None,
              num_episodes: int = 10,
              video: bool = True,
              visualize_planner: bool = False,
@@ -41,7 +41,7 @@ def evaluate(logdir: Path,
              existing_env: Optional[VectorHabitat] = None,
              ) -> Tuple[Dict[str, float], Optional[List[wandb.Video]]]:
     """Evaluate trained model in a Habitat environment."""
-    assert [checkpoint, baseline, model].count(None) == 2, 'Exactly one of checkpoint, baseline and model must be provided'
+    assert [checkpoint, baseline, agent].count(None) == 2, 'Exactly one of checkpoint, baseline and agent must be provided'
     if seed is not None:
         # TODO: Make deterministic mode work again
         random.seed(seed)
@@ -56,6 +56,7 @@ def evaluate(logdir: Path,
         original_params = None
     else:
         env = existing_env
+        env.reset()
         original_config, original_params = reconfigure_env(env, video, seed)
     env = wrap_env(env, task)
 
@@ -71,10 +72,12 @@ def evaluate(logdir: Path,
         distribute_scope = contextlib.nullcontext()
     with distribute_scope:
         if baseline is None:
-            if model is None:
+            if agent is None:
                 assert checkpoint is not None
                 model, _ = restore_model(checkpoint, logdir)
-            agent = MPCAgent(env.action_space, model, objective='reward', visualize=visualize_planner)
+                agent = MPCAgent(env.action_space, model, objective='reward', visualize=visualize_planner)
+            else:
+                agent.visualize = visualize_planner
         else:
             if baseline == 'random':
                 agent = RandomAgent(env.action_space)

@@ -34,7 +34,7 @@ def _gpu_id_from_name(name: str) -> int:
 
 @gin.configurable('tf.gpus', whitelist=['gpu_ids', 'memory_growth'])
 def get_distribution_strategy(gpu_ids: Optional[Sequence[int]] = None, memory_growth: bool = True) -> tf.distribute.Strategy:
-    available_gpus = tf.config.experimental.list_physical_devices("GPU")
+    available_gpus = tf.config.experimental.list_physical_devices('GPU')
     if not available_gpus:
         logger.warning('No GPUs found; running on CPU')
         return tf.distribute.OneDeviceStrategy('/cpu:0')
