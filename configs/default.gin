@@ -63,10 +63,15 @@ tf.keras.optimizers.Adam.epsilon = 1e-4
 
 # Planner
 MPCAgent.planner = @CrossEntropyMethod
+# MPCAgent.planner = @HierarchicalCrossEntropyMethod
 CrossEntropyMethod.horizon = 12
 CrossEntropyMethod.iterations = 10
 CrossEntropyMethod.amount = 1000  # number of action sequence samples per iteration
 CrossEntropyMethod.top_k = 100  # number of best samples to use as basis for next iteration
+HierarchicalCrossEntropyMethod.horizon = 10
+HierarchicalCrossEntropyMethod.iterations = 4
+HierarchicalCrossEntropyMethod.amount = 1000  # number of action sequence samples per iteration
+HierarchicalCrossEntropyMethod.top_k = 100  # number of best samples to use as basis for next iteration
 
 # TF options
 # tf.options.log_device_placement = False
