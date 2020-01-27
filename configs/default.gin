@@ -43,6 +43,7 @@ predictors.OpenLoopRSSMPredictor.state_size = 40
 predictors.OpenLoopRSSMPredictor.belief_size = 300
 predictors.OpenLoopRSSMPredictor.embed_size = 300
 predictors.OpenLoopRSSMPredictor.num_layers = 1
+predictors.OpenLoopRSSMPredictor.activation = @auto_shape.ReLU
 # Model.rnn_class = @rnns.SimpleRNN
 Model.rnn_class = @rnns.HierarchicalRNN
 rnns.HierarchicalRNN.open_loop_predictor_class = @predictors.OpenLoopRSSMPredictor
@@ -50,8 +51,12 @@ rnns.HierarchicalRNN.time_scales = [1, 3, 9]
 rnns.HierarchicalRNN.action_embedding_sizes = [1, 2, 2]
 DenseVAE.num_units = 100
 DenseVAE.num_layers = 1
+DenseVAE.activation = @auto_shape.ReLU
 Model.decoders.num_layers = 1  # used for reward and goal prediction
 Model.decoders.num_units = 100  # used for reward and goal prediction
+Model.decoders.activation = @auto_shape.ReLU
+Encoder.activation = @auto_shape.ReLU
+Decoder.activation = @auto_shape.ReLU
 training.batch_shape = (64, 64)  # [batch_size, time_batch]
 
 # Optimizer

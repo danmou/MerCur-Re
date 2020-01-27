@@ -2,7 +2,7 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import Any, Optional, Sequence
+from typing import Any, Optional, Sequence, Type
 
 import numpy as np
 import tensorflow as tf
@@ -22,7 +22,9 @@ class SequentialBlock(auto_shape.Sequential):
                  ) -> None:
         layers = [] if initial_layers is None else list(initial_layers)
         for i in range(num_layers):
-            layers.append(auto_shape.Dense(num_units, activation=activation, name=f'{name}_dense_{i}'))
+            layers.append(auto_shape.Dense(num_units, name=f'{name}_dense_{i}'))
+            if activation is not None:
+                layers.append(activation(name=f'{name}_activation_{i}'))
             if batch_norm:
                 layers.append(auto_shape.BatchNormalization())
         super().__init__(layers, name=name)
@@ -32,9 +34,13 @@ class ShapedDense(auto_shape.Sequential):
     """A dense layer with given output shape"""
     def __init__(self,
                  shape: Sequence[int],
+                 activation: Optional[Type[tf.keras.layers.Layer]] = None,
                  name: str = 'shaped_dense',
                  **kwargs: Any,
                  ) -> None:
         units = np.prod(shape)
-        super().__init__([auto_shape.Dense(units, **kwargs, name=f'{name}_dense'),
-                          auto_shape.Reshape(shape, name=f'{name}_reshape')], name=name)
+        layers = [auto_shape.Dense(units, **kwargs, name=f'{name}_dense')]
+        if activation is not None:
+            layers.append(activation(name=f'{name}_activation'))
+        layers.append(auto_shape.Reshape(shape, name=f'{name}_reshape'))
+        super().__init__(layers, name=name)

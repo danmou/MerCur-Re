@@ -16,7 +16,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Optional, Tuple
+from typing import Any, Optional, Tuple, Type
 
 import gin
 import tensorflow as tf
@@ -68,7 +68,7 @@ class SequentialNormalBlock(auto_shape.Layer):
     def __init__(self,
                  num_layers: int,
                  num_units: int,
-                 activation: str,
+                 activation: Optional[Type[tf.keras.layers.Layer]],
                  batch_norm: bool,
                  output_size: int,
                  min_stddev: float = 0.1,
@@ -122,7 +122,7 @@ class OpenLoopRSSMPredictor(OpenLoopPredictor):
                  mean_only: bool = False,
                  min_stddev: float = 0.1,
                  num_layers: int = 1,
-                 activation: str = 'relu',
+                 activation: Optional[Type[tf.keras.layers.Layer]] = auto_shape.ReLU,
                  batch_norm: bool = False,
                  name: str = 'rssm',
                  ) -> None:

@@ -4,6 +4,7 @@
 
 from typing import Any, List, Optional, Union
 
+import gin
 import tensorflow as tf
 from tensorflow.keras import layers
 
@@ -132,6 +133,21 @@ class Concatenate(AutoShapeMixin, layers.Concatenate):
 
 class BatchNormalization(AutoShapeMixin, layers.BatchNormalization):
     _USE_V2_BEHAVIOR = False  # https://github.com/tensorflow/tensorflow/issues/32477
+
+
+@gin.configurable
+class ReLU(AutoShapeMixin, layers.ReLU):
+    pass
+
+
+@gin.configurable
+class LeakyReLU(AutoShapeMixin, layers.LeakyReLU):
+    pass
+
+
+@gin.configurable
+class PReLU(AutoShapeMixin, layers.PReLU):
+    pass
 
 
 class RNN(AutoShapeMixin, layers.RNN):
