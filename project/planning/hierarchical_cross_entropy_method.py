@@ -77,7 +77,7 @@ class HierarchicalCrossEntropyMethod(Planner):
             vis_goal = visualization_goal if vae is None else None
             mean, std_dev = planner(initial_state, mean, std_dev, vis_goal)  # shape: [horizon, action_space]
             if vae is not None:
-                mean = vae.decoder(mean[tf.newaxis, :])  # shape: [1, horizon, factor, new_action_space]
+                mean = vae.decoder(mean[tf.newaxis, :], training=False)  # shape: [1, horizon, factor, new_action_space]
                 factor = mean.shape[2]
                 mean = tf.reshape(mean, [-1] + mean.shape[3:].as_list())  # shape: [horizon * factor, new_action_space]
                 std_dev = tf.reduce_mean(std_dev, axis=-1)  # shape: [horizon]

@@ -40,7 +40,7 @@ class MPCAgent(Agent):
         self._visualize = tf.Variable(visualize)
 
     def _objective_fn(self, state: Tuple[tf.Tensor, ...]) -> tf.Tensor:
-        obj = self._objective_decoder(self._predictor.state_to_features(state))
+        obj = self._objective_decoder(self._predictor.state_to_features(state), training=False)
         return tf.reduce_sum(obj, axis=1)
 
     @property
@@ -74,11 +74,11 @@ class MPCAgent(Agent):
             action = tf.zeros_like(self._action_space.low)
         self._goal.assign(observations['goal'])
         observations = tf.nest.map_structure(lambda t: t[tf.newaxis, tf.newaxis, :], observations)
-        embedded = self._encoder(observations)[0]
+        embedded = self._encoder(observations, training=False)[0]
         action = action[tf.newaxis, :]
         use_obs = tf.constant([[True]])
         state = tuple(v.value() for v in self._state)  # This is needed to prevent weird errors with dead weakrefs
-        _, self.state = self._predictor((embedded, action, use_obs), state)  # type: ignore[misc]  # mypy/issues/1362
+        _, self.state = self._predictor((embedded, action, use_obs), state, training=False)  # type: ignore[misc]  # mypy/issues/1362
 
     @tf.function
     def act(self) -> tf.Tensor:

@@ -11,7 +11,7 @@ import tensorflow as tf
 from project.util.tf import auto_shape
 from project.util.tf.losses import kl_divergence, mse
 
-from .basic import ShapedDense
+from .basic import SequentialBlock, ShapedDense
 from .wrappers import ExtraBatchDim
 
 
@@ -21,18 +21,17 @@ class DenseVAEEncoder(auto_shape.Layer):
                  num_units: int = 100,
                  num_layers: int = 1,
                  activation: str = 'relu',
+                 batch_norm: bool = False,
                  name: str = 'vae_encoder',
                  ) -> None:
         super().__init__()
-        self._encoder = auto_shape.Sequential([auto_shape.Flatten(name=f'{name}_flatten')]
-                                              + [auto_shape.Dense(num_units,
-                                                                  activation=activation,
-                                                                  name=f'{name}_dense_{i}')
-                                                 for i in range(num_layers)]
-                                              + [ShapedDense([2] + list(latent_shape),
-                                                             activation=None,
-                                                             name=f'{name}_shaped_dense')],
-                                              name=f'{name}_sequential')
+        self._encoder = SequentialBlock(num_units,
+                                        num_layers,
+                                        activation,
+                                        batch_norm,
+                                        initial_layers=[auto_shape.Flatten(name=f'{name}_flatten')],
+                                        name=f'{name}_sequential')
+        self._encoder.add(ShapedDense([2] + list(latent_shape), name=f'{name}_shaped_dense'))
 
     def call(self, input: tf.Tensor) -> Dict[str, tf.Tensor]:
         output = self._encoder(input)
@@ -48,18 +47,17 @@ class DenseVAEDecoder(auto_shape.Layer):
                  num_units: int = 100,
                  num_layers: int = 1,
                  activation: str = 'relu',
+                 batch_norm: bool = False,
                  name: str = 'vae_decoder',
                  ) -> None:
         super().__init__()
-        self._decoder = auto_shape.Sequential([auto_shape.Flatten(name=f'{name}_flatten')]
-                                              + [auto_shape.Dense(num_units,
-                                                                  activation=activation,
-                                                                  name=f'{name}_dense_{i}')
-                                                 for i in range(num_layers)]
-                                              + [ShapedDense(output_shape,
-                                                             activation=None,
-                                                             name=f'{name}_shaped_dense')],
-                                              name=f'{name}_sequential')
+        self._decoder = SequentialBlock(num_units,
+                                        num_layers,
+                                        activation,
+                                        batch_norm,
+                                        initial_layers=[auto_shape.Flatten(name=f'{name}_flatten')],
+                                        name=f'{name}_sequential')
+        self._decoder.add(ShapedDense(output_shape, name=f'{name}_shaped_dense'))
 
     def call(self, input: tf.Tensor) -> tf.Tensor:
         return self._decoder(input)
@@ -73,10 +71,21 @@ class DenseVAE(auto_shape.Layer):
                  num_units: int = 100,
                  num_layers: int = 1,
                  activation: str = 'relu',
+                 batch_norm: bool = False,
                  name: str = 'vae',
                  ) -> None:
-        self.encoder = ExtraBatchDim(DenseVAEEncoder(latent_shape, num_units, num_layers, activation, name=f'{name}_encoder'))
-        self.decoder = ExtraBatchDim(DenseVAEDecoder(input_shape, num_units, num_layers, activation, name=f'{name}_decoder'))
+        self.encoder = ExtraBatchDim(DenseVAEEncoder(latent_shape,
+                                                     num_units,
+                                                     num_layers,
+                                                     activation,
+                                                     batch_norm,
+                                                     name=f'{name}_encoder'))
+        self.decoder = ExtraBatchDim(DenseVAEDecoder(input_shape,
+                                                     num_units,
+                                                     num_layers,
+                                                     activation,
+                                                     batch_norm,
+                                                     name=f'{name}_decoder'))
         super().__init__(batch_dims=2, name=name)
 
     def call(self, input: tf.Tensor, mask: Optional[tf.Tensor] = None) -> tf.Tensor:

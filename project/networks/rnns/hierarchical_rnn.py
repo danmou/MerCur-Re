@@ -2,7 +2,7 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import List, Optional, Tuple, Type
+from typing import List, Optional, Tuple, Type, Union
 
 import gin
 import tensorflow as tf
@@ -71,29 +71,32 @@ class HierarchicalRNN(RNN):
                     actions: tf.Tensor,
                     initial_state: Optional[tf.Tensor] = None,
                     mask: Optional[tf.Tensor] = None,
+                    training: Optional[Union[tf.Tensor, bool]] = None,
                     ) -> Tuple[Tuple[tf.Tensor, ...], Tuple[tf.Tensor, ...]]:
         # This is the first point where we know the size of the action space, so we perform this check here
         assert actions.shape[-1] == self.action_embedding_sizes[0], 'First action embedding size must match action space.'
 
         use_obs = tf.ones(observations.shape[:2] + [1], tf.bool)
-        prior, posterior = self((observations, actions, use_obs), initial_state=initial_state, mask=mask)
+        prior, posterior = self((observations, actions, use_obs), initial_state=initial_state, mask=mask, training=training)
         return prior, posterior
 
     def open_loop(self,
                   actions: tf.Tensor,
                   initial_state: Optional[tf.Tensor] = None,
                   mask: Optional[tf.Tensor] = None,
+                  training: Optional[Union[tf.Tensor, bool]] = None,
                   ) -> Tuple[tf.Tensor, ...]:
         obs_spec: tf.keras.layers.InputSpec = self.predictor.input_spec[0]  # type: ignore[index]
         obs = tf.zeros(actions.shape[:2] + obs_spec.shape[1:], obs_spec.dtype)
         use_obs = tf.zeros(actions.shape[:2] + [1], tf.bool)
         prior: Tuple[tf.Tensor, ...]
-        prior, _ = self((obs, actions, use_obs), initial_state=initial_state, mask=mask)
+        prior, _ = self((obs, actions, use_obs), initial_state=initial_state, mask=mask, training=training)
         return prior
 
     def _apply_time_scales(self,
                            actions: tf.Tensor,
                            mask: Optional[tf.Tensor] = None,
+                           training: Optional[Union[tf.Tensor, bool]] = None,
                            ) -> Tuple[List[tf.Tensor], List[tf.Tensor]]:
         action_sequences = [actions]
         masks = [mask if mask is not None else tf.ones(actions.shape[:2], tf.bool)]
@@ -105,7 +108,7 @@ class HierarchicalRNN(RNN):
                 break
             # TODO: This is basically equivalent to 1D convolution, perhaps we should just use that
             actions_windowed = sliding_window(prev_actions, factor, axis=1)
-            action_sequences.append(vae(actions_windowed))
+            action_sequences.append(vae(actions_windowed, training=training))
             mask_windowed = sliding_window(prev_mask, factor, axis=1)
             masks.append(tf.reduce_all(mask_windowed, axis=-1))
         return action_sequences[1:], masks[1:]
@@ -114,12 +117,13 @@ class HierarchicalRNN(RNN):
              inputs: Tuple[tf.Tensor, tf.Tensor, tf.Tensor],
              initial_state: Optional[tf.Tensor] = None,
              mask: Optional[tf.Tensor] = None,
+             training: Optional[Union[tf.Tensor, bool]] = None,
              ) -> Tuple[Tuple[tf.Tensor, ...], Tuple[tf.Tensor, ...]]:
         prior: Tuple[tf.Tensor, ...]
         posterior: Tuple[tf.Tensor, ...]
-        prior, posterior = self.base_rnn(inputs, initial_state=initial_state, mask=mask)
+        prior, posterior = self.base_rnn(inputs, initial_state=initial_state, mask=mask, training=training)
         obs, base_actions, use_obs = inputs
-        action_sequences, masks = self._apply_time_scales(base_actions, mask)
+        action_sequences, masks = self._apply_time_scales(base_actions, mask, training)
         for actions, mask, time_scale, loss_scale, predictor in zip(action_sequences,
                                                                     masks,
                                                                     self.time_scales[1:],
@@ -131,7 +135,7 @@ class HierarchicalRNN(RNN):
             target = tf.nest.map_structure(lambda x: x[:, time_scale:], posterior)
             post, actions, mask = tf.nest.map_structure(lambda x: x[:, :target[0].shape[1]], (posterior, actions, mask))
             post, actions = tf.nest.map_structure(lambda x: tf.reshape(x, [-1] + x.shape[2:].as_list()), (post, actions))
-            _, predictions = predictor(actions, post)
+            _, predictions = predictor(actions, post, training=training)
             predictions = tf.nest.map_structure(lambda x: tf.reshape(x, mask.shape[:2] + x.shape[1:]), predictions)
             divergence_loss = self.divergence_loss(predictions, target, mask=mask, free_nats=self.divergence_loss_free_nats)
             self.add_loss(divergence_loss * loss_scale, inputs=True)

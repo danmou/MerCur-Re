@@ -58,16 +58,18 @@ class Model(auto_shape.Model):
         self.rnn = rnn_class(predictor_class)
 
     @staticmethod
-    @gin.configurable('Model.decoders', whitelist=['num_units', 'num_layers', 'activation'])
+    @gin.configurable('Model.decoders', whitelist=['num_units', 'num_layers', 'activation', 'batch_norm'])
     def _get_vector_decoder(output_shape: Sequence[int],
                             num_units: int = gin.REQUIRED,
                             num_layers: int = gin.REQUIRED,
                             activation: str = 'relu',
+                            batch_norm: bool = False,
                             name: str = 'vector_encoder'
                             ) -> auto_shape.Layer:
         return networks.ExtraBatchDim(auto_shape.Sequential([networks.SequentialBlock(num_units=num_units,
                                                                                       num_layers=num_layers,
                                                                                       activation=activation,
+                                                                                      batch_norm=batch_norm,
                                                                                       name=f'{name}_block'),
                                                              networks.ShapedDense(output_shape,
                                                                                   activation=None,
@@ -90,25 +92,35 @@ class Model(auto_shape.Model):
         data['length'] = tf.constant([[batch_shape[1]]] * batch_shape[0], self._data_spec['length'].dtype)
         return data
 
-    def closed_loop(self, data: Mapping[str, tf.Tensor]) -> Tuple[Tuple[tf.Tensor, ...], Tuple[tf.Tensor, ...]]:
-        embedded = self.encoder(data)
-        prior, posterior = self.rnn.closed_loop(embedded, data['action'], mask=self._get_mask(data))
+    def closed_loop(self,
+                    data: Mapping[str, tf.Tensor],
+                    **kwargs: Any,
+                    ) -> Tuple[Tuple[tf.Tensor, ...], Tuple[tf.Tensor, ...]]:
+        embedded = self.encoder(data, **kwargs)
+        prior, posterior = self.rnn.closed_loop(embedded, data['action'], mask=self._get_mask(data), **kwargs)
         return prior, posterior
 
     @gin.configurable(whitelist=['context'])
-    def open_loop(self, data: Mapping[str, tf.Tensor], context: int = 5) -> Tuple[tf.Tensor, ...]:
-        embedded = self.encoder(data)
+    def open_loop(self, data: Mapping[str, tf.Tensor], context: int = 5, **kwargs: Any) -> Tuple[tf.Tensor, ...]:
+        embedded = self.encoder(data, **kwargs)
         mask = self._get_mask(data)
         context = min(mask.shape[1] - 1, context)
-        _, closed_loop = self.rnn.closed_loop(embedded[:, :context], data['action'][:, :context], mask=mask[:, :context])
+        _, closed_loop = self.rnn.closed_loop(embedded[:, :context],
+                                              data['action'][:, :context],
+                                              mask=mask[:, :context],
+                                              **kwargs)
         last_posterior = tf.nest.map_structure(lambda x: x[:, -1], closed_loop)
-        open_loop = self.rnn.open_loop(data['action'][:, context:], initial_state=last_posterior, mask=mask[:, context:])
-        return cast(Tuple[tf.Tensor, ...], tf.nest.map_structure(lambda x, y: tf.concat([x, y], 1), closed_loop, open_loop))
+        open_loop = self.rnn.open_loop(data['action'][:, context:],
+                                       initial_state=last_posterior,
+                                       mask=mask[:, context:],
+                                       **kwargs)
+        return cast(Tuple[tf.Tensor, ...],
+                    tf.nest.map_structure(lambda x, y: tf.concat([x, y], 1), closed_loop, open_loop))
 
-    def decode(self, state_features: tf.Tensor) -> Dict[str, tf.Tensor]:
+    def decode(self, state_features: tf.Tensor, **kwargs: Any) -> Dict[str, tf.Tensor]:
         reconstructions = {}
         for name, decoder in self.decoders.items():
-            reconstructions[name] = decoder(state_features)
+            reconstructions[name] = decoder(state_features, **kwargs)
         return reconstructions
 
     def call(self, inputs: Mapping[str, tf.Tensor]) -> tf.Tensor:

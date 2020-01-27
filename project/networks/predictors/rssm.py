@@ -69,6 +69,7 @@ class SequentialNormalBlock(auto_shape.Layer):
                  num_layers: int,
                  num_units: int,
                  activation: str,
+                 batch_norm: bool,
                  output_size: int,
                  min_stddev: float = 0.1,
                  mean_only: bool = False,
@@ -77,7 +78,10 @@ class SequentialNormalBlock(auto_shape.Layer):
         super().__init__(**kwargs)
         self._mean_only = mean_only
         self._min_stddev = min_stddev
-        self._hidden_layers = SequentialBlock(num_units=num_units, num_layers=num_layers, activation=activation)
+        self._hidden_layers = SequentialBlock(num_units=num_units,
+                                              num_layers=num_layers,
+                                              activation=activation,
+                                              batch_norm=batch_norm)
         self._mean_layer = auto_shape.Dense(output_size, activation=None)
         self._stddev_layer = auto_shape.Dense(output_size, activation='softplus')
 
@@ -119,6 +123,7 @@ class OpenLoopRSSMPredictor(OpenLoopPredictor):
                  min_stddev: float = 0.1,
                  num_layers: int = 1,
                  activation: str = 'relu',
+                 batch_norm: bool = False,
                  name: str = 'rssm',
                  ) -> None:
         self._state_size = state_size
@@ -126,11 +131,13 @@ class OpenLoopRSSMPredictor(OpenLoopPredictor):
         self._input_layers = SequentialBlock(num_units=embed_size,
                                              num_layers=num_layers,
                                              activation=activation,
+                                             batch_norm=batch_norm,
                                              name=f'{name}_input_block')
         self._cell = auto_shape.GRUCell(self._belief_size, name=f'{name}_gru_cell')
         self.prior_kwargs = dict(num_layers=num_layers,
                                  num_units=embed_size,
                                  activation=activation,
+                                 batch_norm=batch_norm,
                                  output_size=state_size,
                                  min_stddev=min_stddev,
                                  mean_only=mean_only)

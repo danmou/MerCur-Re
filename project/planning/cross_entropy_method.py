@@ -116,7 +116,7 @@ def cross_entropy_method(initial_state: Tuple[Union[tf.Tensor, tf.Variable], ...
         actions = tf.clip_by_value(actions, action_space.low, action_space.high)
 
         # Evaluate proposal actions.
-        states = rnn(actions, initial_state=initial_state)
+        states = rnn(actions, initial_state=initial_state, training=False)
         objective = objective_fn(states)
 
         # Re-fit belief to the best ones.

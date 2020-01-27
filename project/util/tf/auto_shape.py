@@ -40,6 +40,7 @@ class AutoShapeMixin:
             input)
         if 'mask' in kwargs:
             kwargs['mask'] = tf.ones(self.min_batch_shape, tf.bool)
+        kwargs['training'] = False
         dummy_output = super().__call__(dummy_input, *args, **kwargs)  # type: ignore[misc]  # mypy/issues/5887
         self._output_spec = tf.nest.map_structure(lambda x: layers.InputSpec(shape=[None] * bd + x.shape[bd:],
                                                                              dtype=x.dtype), dummy_output)
@@ -127,6 +128,10 @@ class Reshape(AutoShapeMixin, layers.Reshape):
 
 class Concatenate(AutoShapeMixin, layers.Concatenate):
     pass
+
+
+class BatchNormalization(AutoShapeMixin, layers.BatchNormalization):
+    _USE_V2_BEHAVIOR = False  # https://github.com/tensorflow/tensorflow/issues/32477
 
 
 class RNN(AutoShapeMixin, layers.RNN):

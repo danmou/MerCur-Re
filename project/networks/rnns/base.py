@@ -3,7 +3,7 @@
 # (C) 2019, Daniel Mouritzen
 
 import abc
-from typing import Any, Optional, Tuple, Type
+from typing import Any, Optional, Tuple, Type, Union
 
 import gin
 import tensorflow as tf
@@ -41,6 +41,7 @@ class RNN(abc.ABC, auto_shape.Layer):
                     actions: tf.Tensor,
                     initial_state: Optional[tf.Tensor] = None,
                     mask: Optional[tf.Tensor] = None,
+                    training: Optional[Union[tf.Tensor, bool]] = None,
                     ) -> Tuple[Tuple[tf.Tensor, ...], Tuple[tf.Tensor, ...]]:
         raise NotImplementedError
 
@@ -49,6 +50,7 @@ class RNN(abc.ABC, auto_shape.Layer):
                   actions: tf.Tensor,
                   initial_state: Optional[tf.Tensor] = None,
                   mask: Optional[tf.Tensor] = None,
+                  training: Optional[Union[tf.Tensor, bool]] = None,
                   ) -> Tuple[tf.Tensor, ...]:
         raise NotImplementedError
 
@@ -57,6 +59,7 @@ class RNN(abc.ABC, auto_shape.Layer):
              inputs: Tuple[tf.Tensor, tf.Tensor, tf.Tensor],
              initial_state: Optional[tf.Tensor] = None,
              mask: Optional[tf.Tensor] = None,
+             training: Optional[Union[tf.Tensor, bool]] = None,
              ) -> Tuple[Tuple[tf.Tensor, ...], Tuple[tf.Tensor, ...]]:
         raise NotImplementedError
 
@@ -107,31 +110,37 @@ class SimpleRNN(RNN):
                     actions: tf.Tensor,
                     initial_state: Optional[tf.Tensor] = None,
                     mask: Optional[tf.Tensor] = None,
+                    training: Optional[Union[tf.Tensor, bool]] = None,
                     ) -> Tuple[Tuple[tf.Tensor, ...], Tuple[tf.Tensor, ...]]:
         use_obs = tf.ones(observations.shape[:2] + [1], tf.bool)
-        prior, posterior = self((observations, actions, use_obs), initial_state=initial_state, mask=mask)
+        prior, posterior = self((observations, actions, use_obs),
+                                initial_state=initial_state,
+                                mask=mask,
+                                training=training)
         return prior, posterior
 
     def open_loop(self,
                   actions: tf.Tensor,
                   initial_state: Optional[tf.Tensor] = None,
                   mask: Optional[tf.Tensor] = None,
+                  training: Optional[Union[tf.Tensor, bool]] = None,
                   ) -> Tuple[tf.Tensor, ...]:
         obs_spec: tf.keras.layers.InputSpec = self._predictor.input_spec[0]  # type: ignore[index]
         obs = tf.zeros(actions.shape[:2] + obs_spec.shape[1:], obs_spec.dtype)
         use_obs = tf.zeros(actions.shape[:2] + [1], tf.bool)
         prior: Tuple[tf.Tensor, ...]
-        prior, _ = self((obs, actions, use_obs), initial_state=initial_state, mask=mask)
+        prior, _ = self((obs, actions, use_obs), initial_state=initial_state, mask=mask, training=training)
         return prior
 
     def call(self,
              inputs: Tuple[tf.Tensor, tf.Tensor, tf.Tensor],
              initial_state: Optional[tf.Tensor] = None,
              mask: Optional[tf.Tensor] = None,
+             training: Optional[Union[tf.Tensor, bool]] = None,
              ) -> Tuple[Tuple[tf.Tensor, ...], Tuple[tf.Tensor, ...]]:
         prior: Tuple[tf.Tensor, ...]
         posterior: Tuple[tf.Tensor, ...]
-        prior, posterior = self.rnn(inputs, initial_state=initial_state, mask=mask)
+        prior, posterior = self.rnn(inputs, initial_state=initial_state, mask=mask, training=training)
         divergence_loss = self.divergence_loss(prior, posterior, mask=mask, free_nats=self.divergence_loss_free_nats)
         self.add_loss(divergence_loss * self.divergence_loss_scale, inputs=True)
         self.add_metric(divergence_loss, aggregation='mean', name=f'divergence')

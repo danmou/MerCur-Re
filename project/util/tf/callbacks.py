@@ -230,7 +230,7 @@ class PredictionSummariesCallback(callbacks.Callback):
         return tf.clip_by_value(postprocess(images), 0.0, 1.0)
 
     def _get_reconstructions(self, states: Tuple[tf.Tensor, ...]) -> Dict[str, tf.Tensor]:
-        reconstructions = self._model.decode(self._model.rnn.state_to_features(states))
+        reconstructions = self._model.decode(self._model.rnn.state_to_features(states), training=False)
         reconstructions['image'] = self._postprocess_images(reconstructions['image'])
         return reconstructions
 
@@ -240,8 +240,8 @@ class PredictionSummariesCallback(callbacks.Callback):
         if not episode_batch:
             return {}
         summaries = {}
-        prior, posterior = self._model.closed_loop(episode_batch)
-        open_loop = self._model.open_loop(episode_batch)
+        prior, posterior = self._model.closed_loop(episode_batch, training=False)
+        open_loop = self._model.open_loop(episode_batch, training=False)
         target_images = self._postprocess_images(episode_batch['image'])
         for name, states in [('closed_loop/prior', prior), ('closed_loop/posterior', posterior), ('open_loop', open_loop)]:
             summaries[f'{base_name}/{name}'] = video_summary(target_images, self._get_reconstructions(states)['image'])
