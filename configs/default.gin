@@ -1,5 +1,5 @@
 main.base_logdir = 'logs'
-logging.module_levels = {'matplotlib': 'WARNING', 'PIL': 'WARNING', 'imageio_ffmpeg': 'ERROR'}
+logging.module_levels = {'matplotlib': 'WARNING', 'PIL': 'WARNING', 'imageio_ffmpeg': 'ERROR', 'ffmpeg': 'ERROR'}
 
 ### Planet ###
 # Task
