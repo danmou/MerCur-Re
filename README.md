@@ -2,7 +2,7 @@
 
 ### Installation
 #### Development
-    conda env create
+    conda env create -f environment.yml
     conda activate thesis
 
 #### System install
@@ -15,12 +15,27 @@ To be able to run habitat-sim locally:
 ```bash
 sudo apt update && sudo apt install libjpeg-dev libpng-dev libglfw3-dev libglm-dev libx11-dev libomp-dev libegl1-mesa-dev
 # On Debian additionally install libglvnd-dev
-conda create -n thesis python=3.7 cmake=3.14 tensorflow-gpu=1.15
-conda activate thesis
 
 git clone --recurse-submodules https://github.com/facebookresearch/habitat-sim.git
 git clone --recurse-submodules git@github.com:uzh-rpg/master_thesis_mouritzen.git thesis
 
+cd thesis
+conda env create -f environment.yml
+conda activate thesis
+
+cd ../habitat-sim
+git checkout v0.1.4  # Use version tag corresponding to installed version of Habitat API
+pip install -r requirements.txt
+python setup.py install --headless --with-cuda
+```
+
+### Running
+```bash
+./run.py --help
+```
+
+### Setup MuJoCo and DeepMind Control Suite
+```bash
 wget https://www.roboti.us/download/mujoco200_linux.zip
 mkdir ~/.mujoco
 unzip mujoco200_linux.zip -d ~/.mujoco/
@@ -32,13 +47,7 @@ chmod +x getid_linux
 # Save license to ~/.mujoco/mjkey.txt
 rm getid_linux
 
-cd habitat-sim
-pip install -r requirements.txt
-python setup.py install --headless --with-cuda
-
-cd ../thesis
-git submodule update --init --recursive
-python setup.py install
+conda install git+git://github.com/deepmind/dm_control.git
 ```
 
 ### Datasets

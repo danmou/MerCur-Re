@@ -9,9 +9,10 @@ dependencies:
   - gperftools
   - loguru
   - matplotlib
+  - plotly
   - scikit-image
   - scipy
-  - tensorflow-probability>=0.8
+  - tensorflow-probability=0.8.*
   - tqdm
   - ffmpeg  # needed to create gifs and videos
   - x264  # needed for mp4 videos with ffmpeg
@@ -24,11 +25,13 @@ dependencies:
 
   # habitat dependencies
   - attrs
-  - imageio
+  - cmake=3.14
+  - imageio=2.4.1
   - imageio-ffmpeg
   - numba
   - pillow
   - pyglet
+  - pytorch-gpu  # https://github.com/facebookresearch/habitat-sim/pull/469
   - quaternion  # (numpy-quaternion)
   - requests
   - yacs
@@ -46,8 +49,8 @@ dependencies:
 
     # planet
     - gym[box2d]==0.10.9
-    - git+git://github.com/deepmind/dm_control.git
+#    - git+git://github.com/deepmind/dm_control.git  # optional
 
     # habitat
 #    - git+git://github.com/facebookresearch/habitat-sim.git  # https://github.com/conda/conda/issues/9144
-    - git+git://github.com/facebookresearch/habitat-api.git
+    - git+git://github.com/facebookresearch/habitat-api.git@v0.1.4
