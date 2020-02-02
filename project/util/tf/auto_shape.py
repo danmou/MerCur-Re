@@ -135,6 +135,10 @@ class BatchNormalization(AutoShapeMixin, layers.BatchNormalization):
     _USE_V2_BEHAVIOR = False  # https://github.com/tensorflow/tensorflow/issues/32477
 
 
+class Activation(AutoShapeMixin, layers.Activation):
+    pass
+
+
 @gin.configurable
 class ReLU(AutoShapeMixin, layers.ReLU):
     pass

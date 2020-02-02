@@ -2,7 +2,8 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import Iterable, Mapping, Optional, Type
+import functools
+from typing import Iterable, Mapping, Optional, Type, Union, cast
 
 import gin
 import tensorflow as tf
@@ -16,7 +17,7 @@ class Encoder(auto_shape.Layer):
     def __init__(self,
                  image_input: str = 'image',
                  vector_inputs: Optional[Iterable[str]] = None,
-                 activation: Optional[Type[tf.keras.layers.Layer]] = auto_shape.ReLU,
+                 activation: Union[None, str, Type[tf.keras.layers.Layer]] = auto_shape.ReLU,
                  batch_norm: bool = False,
                  name: str = 'image_encoder') -> None:
         super().__init__(name=name)
@@ -28,6 +29,8 @@ class Encoder(auto_shape.Layer):
         for i, filters in enumerate(filter_counts):
             layers.append(auto_shape.Conv2D(filters=filters, **kwargs, name=f'{name}_conv_{i}'))
             if activation is not None:
+                if isinstance(activation, str):
+                    activation = cast(Type[tf.keras.layers.Layer], functools.partial(auto_shape.Activation, activation))
                 layers.append(activation(name=f'{name}_activation_{i}'))
             if batch_norm:
                 layers.append(auto_shape.BatchNormalization())

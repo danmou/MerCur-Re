@@ -5,7 +5,7 @@
 import pickle
 import re
 from pathlib import Path
-from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Tuple, Type, cast
+from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Tuple, Type, Union, cast
 
 import gin
 import tensorflow as tf
@@ -62,7 +62,7 @@ class Model(auto_shape.Model):
     def _get_vector_decoder(output_shape: Sequence[int],
                             num_units: int = gin.REQUIRED,
                             num_layers: int = gin.REQUIRED,
-                            activation: Optional[Type[tf.keras.layers.Layer]] = auto_shape.ReLU,
+                            activation: Union[None, str, Type[tf.keras.layers.Layer]] = auto_shape.ReLU,
                             batch_norm: bool = False,
                             name: str = 'vector_encoder'
                             ) -> auto_shape.Layer:

@@ -2,7 +2,8 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import Optional, Type
+import functools
+from typing import Type, Union, cast
 
 import gin
 import tensorflow as tf
@@ -15,7 +16,7 @@ class Decoder(auto_shape.Layer):
     """Decoder with architecture from World Models (D. Ha and J. Schmidhuber)"""
     def __init__(self,
                  name: str = 'image_decoder',
-                 activation: Optional[Type[tf.keras.layers.Layer]] = auto_shape.ReLU,
+                 activation: Union[None, str, Type[tf.keras.layers.Layer]] = auto_shape.ReLU,
                  batch_norm: bool = False,
                  ) -> None:
         super().__init__()
@@ -30,6 +31,8 @@ class Decoder(auto_shape.Layer):
                                                      name=f'{name}_conv_t_{i}'))
             if i < 3:
                 if activation is not None:
+                    if isinstance(activation, str):
+                        activation = cast(Type[tf.keras.layers.Layer], functools.partial(auto_shape.Activation, activation))
                     layers.append(activation(name=f'{name}_activation_{i}'))
                 if batch_norm:
                     layers.append(auto_shape.BatchNormalization())

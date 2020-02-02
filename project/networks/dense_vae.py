@@ -2,7 +2,7 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import Dict, Optional, Sequence, Type
+from typing import Dict, Optional, Sequence, Type, Union
 
 import gin
 import numpy as np
@@ -20,7 +20,7 @@ class DenseVAEEncoder(auto_shape.Layer):
                  latent_shape: Sequence[int],
                  num_units: int = 100,
                  num_layers: int = 1,
-                 activation: Optional[Type[tf.keras.layers.Layer]] = auto_shape.ReLU,
+                 activation: Union[None, str, Type[tf.keras.layers.Layer]] = auto_shape.ReLU,
                  batch_norm: bool = False,
                  name: str = 'vae_encoder',
                  ) -> None:
@@ -46,7 +46,7 @@ class DenseVAEDecoder(auto_shape.Layer):
                  output_shape: Sequence[int],
                  num_units: int = 100,
                  num_layers: int = 1,
-                 activation: Optional[Type[tf.keras.layers.Layer]] = auto_shape.ReLU,
+                 activation: Union[None, str, Type[tf.keras.layers.Layer]] = auto_shape.ReLU,
                  batch_norm: bool = False,
                  name: str = 'vae_decoder',
                  ) -> None:
@@ -70,7 +70,7 @@ class DenseVAE(auto_shape.Layer):
                  latent_shape: Sequence[int],
                  num_units: int = 100,
                  num_layers: int = 1,
-                 activation: Optional[Type[tf.keras.layers.Layer]] = auto_shape.ReLU,
+                 activation: Union[None, str, Type[tf.keras.layers.Layer]] = auto_shape.ReLU,
                  batch_norm: bool = False,
                  name: str = 'vae',
                  ) -> None:
