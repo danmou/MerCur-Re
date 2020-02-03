@@ -41,7 +41,8 @@ class Main:
         self._create_symlinks()
         if wandb.run.resumed:
             logger.debug(f'Resumed run {wandb.run.id} ({wandb.run.name})')
-            self._restore_wandb_checkpoint()
+            if not self.checkpoint:
+                self._restore_wandb_checkpoint()
         else:
             self._update_wandb()
         if not tf.executing_eagerly():
@@ -80,22 +81,12 @@ class Main:
         wandb.config.update({'cuda_gpus': os.environ.get('CUDA_VISIBLE_DEVICES')})
 
     def _restore_wandb_checkpoint(self) -> None:
-        restored_files = []
-        try:
-            latest_file = 'checkpoint_latest'
-            additional_data_file = 'checkpoint_additional_data.pickle'
-            with wandb.restore(latest_file) as f:
-                ckpt_file = f.read().strip()
-            restored_files.append(latest_file)
-            wandb.restore(additional_data_file)
-            restored_files.append(additional_data_file)
-            assert ckpt_file, "Can't resume wandb run: no checkpoint found!"
-            wandb.restore(ckpt_file)
-            restored_files.append(ckpt_file)
-        finally:
-            # Even if an error occurred, we don't want wandb to re-upload the downloaded files
-            for file in restored_files:
-                (Path(wandb.run.dir) / file).rename(self.logdir / file)
+        with wandb.restore('checkpoint_latest') as f:
+            ckpt_file = f.read().strip()
+        assert ckpt_file, "Can't resume wandb run: no checkpoint found!"
+        wandb.restore(ckpt_file)
+        wandb.restore('checkpoint_additional_data.pickle')
+        self.checkpoint = Path(wandb.run.dir) / ckpt_file
 
     @contextlib.contextmanager
     def _catch(self) -> Generator[None, None, None]:
@@ -124,8 +115,6 @@ class Main:
                  no_sync: bool = False,
                  baseline: Optional[str] = None,
                  ) -> None:
-        if not self.checkpoint and wandb.run.resumed:
-            self.checkpoint = self.logdir
         assert baseline is not None or self.checkpoint is not None, 'No checkpoint specified!'
         with self._catch():
             Evaluator(logdir=self.logdir, video=video).evaluate(checkpoint=self.checkpoint,
