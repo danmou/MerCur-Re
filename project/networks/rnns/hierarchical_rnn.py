@@ -122,6 +122,5 @@ class HierarchicalRNN(RNN):
             _, predictions = predictor(actions, post, training=training)
             predictions = tf.nest.map_structure(lambda x: tf.reshape(x, mask.shape[:2] + x.shape[1:]), predictions)
             divergence_loss = self.divergence_loss(predictions, target, mask=mask, free_nats=self.divergence_loss_free_nats)
-            self.add_loss(divergence_loss * loss_scale, inputs=True)
-            self.add_metric(divergence_loss, aggregation='mean', name=f'divergence_scale_{time_scale}')
+            self.add_named_loss(divergence_loss, name=f'divergence_scale_{time_scale}', scaling=loss_scale)
         return prior, posterior

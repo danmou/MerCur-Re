@@ -140,10 +140,9 @@ class Model(auto_shape.Model):
         prior, posterior = self.closed_loop(inputs, **kwargs)
         features = self.rnn.state_to_features(posterior)
         reconstructions = self.decode(features, **kwargs)
-        reconstruction_loss = self.reconstruction_loss(inputs, reconstructions, mask)
-        # Note: `add_loss` must be called directly from the `call` method
-        self.add_loss(reconstruction_loss, inputs=True)
-        self.add_metric(sum(self.losses), aggregation='mean', name='loss')
+        reconstruction_losses = self.reconstruction_loss(inputs, reconstructions, mask)
+        for name, (loss, scale) in reconstruction_losses.items():
+            self.add_named_loss(loss, name=f'{name}_recon', scaling=scale)
         return tf.constant(0.0)
 
     @gin.configurable(whitelist=['scales'])
@@ -153,16 +152,14 @@ class Model(auto_shape.Model):
                             reconstructions: Mapping[str, tf.Tensor],
                             mask: Optional[tf.Tensor] = None,
                             scales: Mapping[str, float] = gin.REQUIRED,
-                            ) -> tf.Tensor:
-        total = tf.constant(0.0)
+                            ) -> Dict[str, Tuple[tf.Tensor, float]]:
+        losses = {}
         for name, reconstruction in reconstructions.items():
             assert name in scales, f'No reconstruction loss scale specified for {name!r}'
             target = targets[name]
             scale = scales[name]
-            loss = self.loss_fns[name](reconstruction, target, mask, name=f'{name}_reconstruction_loss')
-            self.add_metric(loss, aggregation='mean', name=f'{name}_recon')
-            total += scale * loss
-        return total
+            losses[name] = (self.loss_fns[name](reconstruction, target, mask, name=f'{name}_recon_loss'), scale)
+        return losses
 
     def save_weights(self, filepath: str, **kwargs: Any) -> None:
         super().save_weights(filepath, **kwargs)

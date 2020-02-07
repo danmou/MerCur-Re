@@ -93,7 +93,6 @@ class DenseVAE(auto_shape.Layer):
         input_recon = self.decoder(z['sample'])
         rec_loss = mse(input_recon, input, mask) * np.prod(input.shape[2:])
         kl_loss = kl_divergence(z['mean'], z['log_var'], mask)
-        self.add_loss(rec_loss + kl_loss, inputs=True)
-        self.add_metric(rec_loss, aggregation='mean', name=f'{self.name}_recon')
-        self.add_metric(kl_loss, aggregation='mean', name=f'{self.name}_kl')
+        self.add_named_loss(rec_loss, name=f'{self.name}_recon', layer=self)
+        self.add_named_loss(kl_loss, name=f'{self.name}_kl', layer=self)
         return z['sample']

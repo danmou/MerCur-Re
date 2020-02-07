@@ -3,13 +3,12 @@
 # (C) 2019, Daniel Mouritzen
 
 from pathlib import Path
-from typing import Dict, Iterator, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterator, Mapping, Optional, Sequence, Tuple
 
 import gin
 import tensorflow as tf
 from loguru import logger
 from tensorflow.python.keras.callbacks import configure_callbacks
-from tensorflow.python.keras.engine.training_utils import MetricsAggregator
 from tensorflow.python.keras.engine.training_v2 import TrainingContext
 from tensorflow.python.keras.utils.mode_keys import ModeKeys
 
@@ -134,14 +133,13 @@ def fit_model(model: tf.keras.Model,
             if train_callbacks.model.stop_training:
                 break
             with train_context.on_epoch(epoch, ModeKeys.TRAIN) as epoch_logs:
-                model.reset_metrics()
                 train_result = run_one_epoch(model,
                                              train_data_iter,
                                              steps_per_epoch=steps_per_epoch,
                                              mode=ModeKeys.TRAIN,
                                              context=train_context)
-                for label, output in zip(model.metrics_names, train_result):
-                    epoch_logs[label] = output
+                if train_result is not None:
+                    epoch_logs.update(train_result)
                 if train_callbacks.model.stop_training:
                     break
                 if (epoch + 1) % validation_freq == 0:
@@ -155,14 +153,13 @@ def fit_model(model: tf.keras.Model,
                     val_context = TrainingContext()
                     with val_context.on_start(model, validation_callbacks, use_samples=False, mode=ModeKeys.TEST):
                         with val_context.on_epoch(epoch, ModeKeys.TEST):
-                            model.reset_metrics()
                             val_result = run_one_epoch(model,
                                                        val_data_iter,
                                                        steps_per_epoch=validation_steps,
                                                        mode=ModeKeys.TEST,
                                                        context=val_context)
-                            for label, output in zip(model.metrics_names, val_result):
-                                epoch_logs[f'val_{label}'] = output
+                            if val_result is not None:
+                                epoch_logs.update({f'val_{k}': v for k, v in val_result.items()})
 
 
 def run_one_epoch(model: tf.keras.Model,
@@ -170,42 +167,41 @@ def run_one_epoch(model: tf.keras.Model,
                   steps_per_epoch: int,
                   mode: str,
                   context: TrainingContext,
-                  ) -> List[float]:
-    aggregator = MetricsAggregator(use_steps=True, steps=steps_per_epoch)
+                  ) -> Optional[Dict[str, float]]:
+    model.reset_metrics()
+    metrics = None
     for step in range(steps_per_epoch):
         with context.on_batch(step=step, mode=mode) as batch_logs:
             inputs = next(iterator)
-            batch_outs = run_on_batch(model, inputs, training=mode == ModeKeys.TRAIN)
-            batch_outs = (batch_outs['total_loss'] + batch_outs['metrics'])
-            if step == 0:
-                aggregator.create(batch_outs)
-            aggregator.aggregate(batch_outs)
-            for label, output in zip(model.metrics_names, batch_outs):
-                batch_logs[label] = output
+            metrics = run_on_batch(model, inputs, training=mode == ModeKeys.TRAIN)
+            batch_logs.update(metrics)
         if context.callbacks.model.stop_training:
             break
-    aggregator.finalize()
-    results: List[float] = aggregator.results
-    return results
+    return metrics
 
 
 @tf.function
 def run_on_batch(model: tf.keras.Model,
                  inputs: Mapping[str, tf.Tensor],
                  training: bool = False,
-                 ) -> Dict[str, List[tf.Tensor]]:
+                 ) -> Dict[str, tf.Tensor]:
     """Runs a single training or validation step on a single batch of data."""
     inputs = {key: reshape_known_dims(tf.cast(inputs[key], spec.dtype), spec.shape)
               for key, spec in model.input_spec.items()}
-    with tf.GradientTape() as tape:
+    with tf.GradientTape(persistent=True) as tape:
         model(inputs, training=training)
-        total_loss = sum(model.losses)
+        losses = model.per_layer_losses
+        total_loss = model.total_loss
     if training:
-        trainable_weights = model.trainable_weights
-        grads = tape.gradient(total_loss, trainable_weights)
-        model.optimizer.apply_gradients(zip(grads, trainable_weights))
-
-    metrics_results = [m.result() for m in model.metrics]
-    total_loss = tf.nest.flatten(total_loss)
-    return {'total_loss': total_loss,
-            'metrics': metrics_results}
+        gradients: Dict[Any, tf.Tensor] = {}
+        for layer, loss in losses.items():
+            variables = layer.trainable_variables
+            grads = tape.gradient(loss, variables)
+            for var, grad in zip(variables, grads):
+                if grad is not None:
+                    ref = var.experimental_ref()
+                    gradients[ref] = gradients.get(ref, 0.0) + grad
+        model.optimizer.apply_gradients(zip(gradients.values(), (var.deref() for var in gradients.keys())))
+    metrics = {'loss': total_loss}
+    metrics.update({m.name: m.result() for m in model.metrics})
+    return metrics

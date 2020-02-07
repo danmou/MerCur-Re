@@ -123,6 +123,5 @@ class SimpleRNN(RNN):
         posterior: Tuple[tf.Tensor, ...]
         prior, posterior = self.rnn(inputs, initial_state=initial_state, mask=mask, training=training)
         divergence_loss = self.divergence_loss(prior, posterior, mask=mask, free_nats=self.divergence_loss_free_nats)
-        self.add_loss(divergence_loss * self.divergence_loss_scale, inputs=True)
-        self.add_metric(divergence_loss, aggregation='mean', name=f'divergence')
+        self.add_named_loss(divergence_loss, name='divergence', scaling=self.divergence_loss_scale)
         return prior, posterior

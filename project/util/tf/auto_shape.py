@@ -2,11 +2,12 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import Any, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import gin
 import tensorflow as tf
 from tensorflow.keras import layers
+from tensorflow.python.training.tracking.layer_utils import filter_empty_layer_containers
 
 from project.util.typing import Nested
 
@@ -30,6 +31,7 @@ class AutoShapeMixin:
         self._input_spec: Optional[layers.InputSpec] = None
         self._output_spec: Optional[layers.InputSpec] = None
         self.built_with_input = False
+        self._named_losses: Dict[str, tf.Tensor] = {}
 
     def build_with_input(self, input: Union[Nested[tf.TensorSpec], Nested[tf.Tensor]], *args: Any, **kwargs: Any) -> None:
         bd = self.batch_dims
@@ -93,6 +95,43 @@ class AutoShapeMixin:
             return super().compute_output_shape(input_shape)  # type: ignore[misc]  # mypy/issues/5887
         batch_shape = tf.nest.flatten(input_shape)[0][:self.batch_dims]
         return tf.nest.map_structure(lambda x: batch_shape + x[self.batch_dims:], self.output_shape)
+
+    @property
+    def named_losses(self) -> Dict[str, tf.Tensor]:
+        losses = self._named_losses.copy()
+        if hasattr(self, '_layers'):
+            for layer in filter_empty_layer_containers(self._layers):  # type: ignore[attr-defined]
+                layer_losses = getattr(layer, 'named_losses', None)
+                if layer_losses:
+                    for name, loss in layer_losses.items():
+                        assert name not in losses, f'Loss names must be unique, but there are two losses called {name}!'
+                        losses[name] = loss
+        return losses
+
+    @property
+    def total_loss(self) -> tf.Tensor:
+        return sum(loss * loss._scaling for loss in self.named_losses.values())
+
+    @property
+    def per_layer_losses(self) -> Dict[layers.Layer, tf.Tensor]:
+        losses: Dict[layers.Layer, tf.Tensor] = {}
+        for loss in self.named_losses.values():
+            layer = loss._layer if loss._layer is not None else self
+            losses[layer] = losses.get(layer, 0.0) + loss * loss._scaling
+        return losses
+
+    def add_named_loss(self,
+                       loss: tf.Tensor,
+                       name: str,
+                       scaling: float = 1.0,
+                       layer: Optional[layers.Layer] = None,
+                       input_dependent: bool = True,
+                       ) -> None:
+        loss._unconditional_loss = not input_dependent
+        loss._scaling = scaling
+        loss._layer = layer
+        self._named_losses[name] = loss
+        self.add_metric(loss, aggregation='mean', name=name)  # type: ignore[attr-defined]
 
 
 class Layer(AutoShapeMixin, layers.Layer):
