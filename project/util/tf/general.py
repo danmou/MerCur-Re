@@ -50,10 +50,10 @@ def get_distribution_strategy(gpu_ids: Optional[Sequence[int]] = None, memory_gr
         tf.config.experimental.set_memory_growth(gpu, memory_growth)
 
     if len(available_gpus) == 1:
-        logger.info('Running on single GPU')
+        logger.debug('Running on single GPU')
         return tf.distribute.OneDeviceStrategy(f'/gpu:{_gpu_id_from_name(available_gpus[0].name)}')
 
-    logger.info(f'Running on {len(available_gpus)} GPUs')
+    logger.warning(f'Running on multiple GPUs, this probably won\'t work.')
     return tf.distribute.MirroredStrategy()
 
 
@@ -172,3 +172,9 @@ def sliding_window(tensor: tf.Tensor, size: int, axis: int = 0) -> tf.Tensor:
     reshaped = tf.transpose(res, perm=list(range(1, axis + 1)) + [0] + list(range(axis + 1, res.shape.ndims)))
     correct_shape = tensor.shape[:axis] + [tensor.shape[axis] - size + 1, size] + tensor.shape[axis + 1:]
     return tf.ensure_shape(reshaped, correct_shape)
+
+
+def reshape_known_dims(tensor: tf.Tensor, shape: Sequence[Optional[int]]) -> tf.Tensor:
+    """Like tf.reshape except undefined dimensions in the target shape are kept the same as the input"""
+    shape = [s or tensor.shape[i] for i, s in enumerate(shape)]
+    return tf.reshape(tensor, shape)

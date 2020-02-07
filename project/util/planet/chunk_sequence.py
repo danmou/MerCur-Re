@@ -84,5 +84,5 @@ def chunk_sequence(sequence: Dict[str, tf.Tensor],
         chunks: Dict[str, tf.Tensor] = tf.nest.map_structure(
             lambda tensor: tf.reshape(tensor, [num_chunks, chunk_length] + tensor.shape[1:].as_list()),
             clipped)
-        chunks['length'] = tf.minimum(chunk_length, length) * tf.ones((num_chunks,), dtype=tf.int32)
+        chunks['length'] = tf.minimum(chunk_length, length) * tf.ones((num_chunks, 1), dtype=tf.int32)
         return chunks

@@ -2,7 +2,6 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-import contextlib
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Mapping, Optional, Sequence, Tuple
@@ -55,18 +54,14 @@ class Evaluator:
 
             save_dir = self.logdir / 'eval' / task / f'{datetime.now():%Y%m%d-%H%M%S}'
 
-            if not tf.distribute.has_strategy():
-                distribute_scope = get_distribution_strategy().scope()
+            get_distribution_strategy()
+            if agents is not None:
+                agent = agents[task]
             else:
-                distribute_scope = contextlib.nullcontext()
-            with distribute_scope:
-                if agents is not None:
-                    agent = agents[task]
-                else:
-                    agent = self.get_agent(sim.action_space, checkpoint, baseline)
-                if isinstance(agent, MPCAgent):
-                    agent.visualize = visualize_planner  # type: ignore[misc]  # mypy/issues/1362
-                mean_metrics[task] = sim.run(agent, num_episodes, log=True, save_dir=save_dir, save_video=self.video)
+                agent = self.get_agent(sim.action_space, checkpoint, baseline)
+            if isinstance(agent, MPCAgent):
+                agent.visualize = visualize_planner  # type: ignore[misc]  # mypy/issues/1362
+            mean_metrics[task] = sim.run(agent, num_episodes, log=True, save_dir=save_dir, save_video=self.video)
 
             if self.video:
                 videos[task] = [wandb.Video(str(vid), fps=10, format="mp4") for vid in save_dir.glob('*.mp4')]

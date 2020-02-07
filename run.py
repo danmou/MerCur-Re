@@ -22,6 +22,6 @@ if __name__ == '__main__':
     else:
         print('Could not find libtcmalloc.so (part of gperftools); memory leakage may occur.', file=sys.stderr)
     ctx = multiprocessing.get_context('spawn')
-    p = ctx.Process(target=run)
+    p = ctx.Process(target=run)  # type: ignore[attr-defined]
     p.start()
     p.join()
