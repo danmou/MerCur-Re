@@ -6,7 +6,7 @@ from typing import Any, Dict, Mapping, Optional, Sequence, Union
 
 import tensorflow as tf
 
-from project.util.tf import auto_shape
+from project.util.tf import auto_shape, combine_dims, split_dim
 
 
 class ExtraBatchDim(auto_shape.Wrapper):
@@ -22,23 +22,15 @@ class ExtraBatchDim(auto_shape.Wrapper):
     def build(self, input_shape: Union[None, tf.TensorShape, Dict[str, tf.TensorShape]] = None) -> None:
         super().build(tf.nest.map_structure(self._combine_shape, input_shape))
 
-    def _combine(self, tensor: tf.Tensor) -> tf.Tensor:
-        if tensor.shape.ndims < 2:
-            return tensor
-        return tf.reshape(tensor, [-1] + tensor.shape[2:].as_list())
-
-    def _uncombine(self, tensor: tf.Tensor, batch_shape: tf.TensorShape) -> tf.Tensor:
-        return tf.reshape(tensor, batch_shape + tensor.shape[1:])
-
     @tf.function
     def call(self, input: Union[tf.Tensor, Dict[str, tf.Tensor]], **kwargs: Any) -> tf.Tensor:
         input_flattened = tf.nest.flatten(input)
         batch_shape = input_flattened[0].shape[:2]
         assert all(i.shape[:2].as_list() == batch_shape.as_list() for i in input_flattened), (
             f'Mismatched batch dimensions in input: {input_flattened}')
-        input_combined = tf.nest.map_structure(self._combine, input)
+        input_combined = tf.nest.map_structure(lambda t: combine_dims(t, 0, 2), input)
         output_combined = self.layer(input_combined, **kwargs)
-        return tf.nest.map_structure(lambda t: self._uncombine(t, batch_shape), output_combined)
+        return tf.nest.map_structure(lambda t: split_dim(t, 0, batch_shape), output_combined)
 
 
 class SelectItems(auto_shape.Wrapper):

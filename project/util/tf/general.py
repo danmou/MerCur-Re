@@ -76,6 +76,64 @@ def trace_profile(writer: tf.summary.SummaryWriter) -> Generator[None, None, Non
         tf.summary.trace_export(name="profile", step=0)
 
 
+def swap_dims(tensors: Nested[tf.Tensor], dim_a: int, dim_b: int) -> Nested[tf.Tensor]:
+    if dim_a == dim_b:
+        return tensors
+
+    def fn(tensor: tf.Tensor, a: int, b: int) -> tf.Tensor:
+        if a < 0:
+            a += tensor.shape.ndims
+        if b < 0:
+            b += tensor.shape.ndims
+        perm = list(range(tensor.shape.ndims))
+        perm[a] = b
+        perm[b] = a
+        return tf.transpose(tensor, perm)
+
+    return tf.nest.map_structure(lambda x: fn(x, dim_a, dim_b), tensors)
+
+
+def move_dim(tensors: Nested[tf.Tensor], current: int, new: int) -> Nested[tf.Tensor]:
+    if current == new:
+        return tensors
+
+    def fn(tensor: tf.Tensor, c: int, n: int) -> tf.Tensor:
+        if c < 0:
+            c += tensor.shape.ndims
+        if n < 0:
+            n += tensor.shape.ndims
+        perm = list(range(tensor.shape.ndims))
+        perm.remove(c)
+        perm.insert(n, c)
+        return tf.transpose(tensor, perm)
+
+    return tf.nest.map_structure(lambda x: fn(x, current, new), tensors)
+
+
+def combine_dims(tensors: Nested[tf.Tensor], start: int, end: int) -> Nested[tf.Tensor]:
+    """Combine (flatten) dimensions from `start` to `end` (not including end)"""
+    if start >= end - 1:
+        return tensors
+
+    def fn(tensor: tf.Tensor) -> tf.Tensor:
+        if tensor.shape.ndims < end - start:
+            return tensor
+        return tf.reshape(tensor, tensor.shape[:start].as_list() + [-1] + tensor.shape[end:].as_list())
+
+    return tf.nest.map_structure(fn, tensors)
+
+
+def split_dim(tensors: Nested[tf.Tensor], dim: int, shape: Sequence[int]) -> Nested[tf.Tensor]:
+    """Split dimension into given shape"""
+    if len(shape) <= 1:
+        return tensors
+
+    def fn(tensor: tf.Tensor) -> tf.Tensor:
+        return tf.reshape(tensor, tensor.shape[:dim].as_list() + list(shape) + tensor.shape[dim + 1:].as_list())
+
+    return tf.nest.map_structure(fn, tensors)
+
+
 def map_fn(fn: Callable,
            *args: Nested[tf.Tensor],
            axis: int = 0,
@@ -86,14 +144,17 @@ def map_fn(fn: Callable,
     Improved version of tf.map_fn and tf.vectorized_map that allows using a function that take multiple args
     and vectorizing over any axis
     """
-    assert axis >= 0, 'Axis to map_fn must be non-negative'
-    perm_in = [axis] + list(range(axis))  # e.g. [2, 0, 1]
-    perm_out = list(range(1, axis + 1)) + [0]  # e.g. [1, 2, 0]
-    args_transposed = tf.nest.map_structure(lambda x: tf.transpose(x, perm_in + list(range(axis + 1, x.shape.ndims))),
-                                            args)
-    output_transposed = (tf.vectorized_map if vectorized else tf.map_fn)(lambda a: fn(*a), args_transposed, **kwargs)
-    return tf.nest.map_structure(lambda x: tf.transpose(x, perm_out + list(range(axis + 1, x.shape.ndims))),
-                                 output_transposed)
+    map_ = tf.vectorized_map if vectorized else tf.map_fn
+    return move_dim(map_(lambda a: fn(*a), move_dim(args, axis, 0), **kwargs), 0, axis)
+
+
+def scan(fn: Callable,
+         elems: Nested[tf.Tensor],
+         axis: int = 0,
+         **kwargs: Any,
+         ) -> Nested[tf.Tensor]:
+    """Improved version of tf.scan that allows scanning over any axis"""
+    return move_dim(tf.scan(fn=fn, elems=move_dim(elems, axis, 0), **kwargs), 0, axis)
 
 
 def sliding_window(tensor: tf.Tensor, size: int, axis: int = 0) -> tf.Tensor:
