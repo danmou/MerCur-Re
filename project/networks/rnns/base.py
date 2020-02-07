@@ -35,7 +35,6 @@ class RNN(abc.ABC, auto_shape.Layer):
                          mask: Optional[tf.Tensor] = None) -> tf.Tensor:
         raise NotImplementedError
 
-    @abc.abstractmethod
     def closed_loop(self,
                     observations: tf.Tensor,
                     actions: tf.Tensor,
@@ -43,16 +42,25 @@ class RNN(abc.ABC, auto_shape.Layer):
                     mask: Optional[tf.Tensor] = None,
                     training: Optional[Union[tf.Tensor, bool]] = None,
                     ) -> Tuple[Tuple[tf.Tensor, ...], Tuple[tf.Tensor, ...]]:
-        raise NotImplementedError
+        use_obs = tf.ones(observations.shape[:2] + [1], tf.bool)
+        prior, posterior = self((observations, actions, use_obs),
+                                initial_state=initial_state,
+                                mask=mask,
+                                training=training)
+        return prior, posterior
 
-    @abc.abstractmethod
     def open_loop(self,
                   actions: tf.Tensor,
                   initial_state: Optional[tf.Tensor] = None,
                   mask: Optional[tf.Tensor] = None,
                   training: Optional[Union[tf.Tensor, bool]] = None,
                   ) -> Tuple[tf.Tensor, ...]:
-        raise NotImplementedError
+        obs_spec: tf.keras.layers.InputSpec = self.predictor.input_spec[0]  # type: ignore[index]
+        obs = tf.zeros(actions.shape[:2] + obs_spec.shape[1:], obs_spec.dtype)
+        use_obs = tf.zeros(actions.shape[:2] + [1], tf.bool)
+        prior: Tuple[tf.Tensor, ...]
+        prior, _ = self((obs, actions, use_obs), initial_state=initial_state, mask=mask, training=training)
+        return prior
 
     @abc.abstractmethod
     def call(self,
@@ -104,33 +112,6 @@ class SimpleRNN(RNN):
                          state2: Tuple[tf.Tensor, ...],
                          mask: Optional[tf.Tensor] = None) -> tf.Tensor:
         return self._predictor.state_divergence(state1, state2, mask)
-
-    def closed_loop(self,
-                    observations: tf.Tensor,
-                    actions: tf.Tensor,
-                    initial_state: Optional[tf.Tensor] = None,
-                    mask: Optional[tf.Tensor] = None,
-                    training: Optional[Union[tf.Tensor, bool]] = None,
-                    ) -> Tuple[Tuple[tf.Tensor, ...], Tuple[tf.Tensor, ...]]:
-        use_obs = tf.ones(observations.shape[:2] + [1], tf.bool)
-        prior, posterior = self((observations, actions, use_obs),
-                                initial_state=initial_state,
-                                mask=mask,
-                                training=training)
-        return prior, posterior
-
-    def open_loop(self,
-                  actions: tf.Tensor,
-                  initial_state: Optional[tf.Tensor] = None,
-                  mask: Optional[tf.Tensor] = None,
-                  training: Optional[Union[tf.Tensor, bool]] = None,
-                  ) -> Tuple[tf.Tensor, ...]:
-        obs_spec: tf.keras.layers.InputSpec = self._predictor.input_spec[0]  # type: ignore[index]
-        obs = tf.zeros(actions.shape[:2] + obs_spec.shape[1:], obs_spec.dtype)
-        use_obs = tf.zeros(actions.shape[:2] + [1], tf.bool)
-        prior: Tuple[tf.Tensor, ...]
-        prior, _ = self((obs, actions, use_obs), initial_state=initial_state, mask=mask, training=training)
-        return prior
 
     def call(self,
              inputs: Tuple[tf.Tensor, tf.Tensor, tf.Tensor],

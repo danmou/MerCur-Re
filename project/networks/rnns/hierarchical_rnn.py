@@ -75,23 +75,7 @@ class HierarchicalRNN(RNN):
                     ) -> Tuple[Tuple[tf.Tensor, ...], Tuple[tf.Tensor, ...]]:
         # This is the first point where we know the size of the action space, so we perform this check here
         assert actions.shape[-1] == self.action_embedding_sizes[0], 'First action embedding size must match action space.'
-
-        use_obs = tf.ones(observations.shape[:2] + [1], tf.bool)
-        prior, posterior = self((observations, actions, use_obs), initial_state=initial_state, mask=mask, training=training)
-        return prior, posterior
-
-    def open_loop(self,
-                  actions: tf.Tensor,
-                  initial_state: Optional[tf.Tensor] = None,
-                  mask: Optional[tf.Tensor] = None,
-                  training: Optional[Union[tf.Tensor, bool]] = None,
-                  ) -> Tuple[tf.Tensor, ...]:
-        obs_spec: tf.keras.layers.InputSpec = self.predictor.input_spec[0]  # type: ignore[index]
-        obs = tf.zeros(actions.shape[:2] + obs_spec.shape[1:], obs_spec.dtype)
-        use_obs = tf.zeros(actions.shape[:2] + [1], tf.bool)
-        prior: Tuple[tf.Tensor, ...]
-        prior, _ = self((obs, actions, use_obs), initial_state=initial_state, mask=mask, training=training)
-        return prior
+        return super().closed_loop(observations, actions, initial_state, mask, training)
 
     def _apply_time_scales(self,
                            actions: tf.Tensor,
