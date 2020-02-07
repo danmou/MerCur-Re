@@ -195,6 +195,7 @@ class Habitat(habitat.RLEnv):
             self._called_stop = True
             obs, reward, done, info = super().step('STOP')
             info['taken_action'] = 0.0
+            info['timeout'] = not self.episode_success()
         else:
             TurnAngle.angle = action * 90.0 / 2
             sum_reward = 0.0

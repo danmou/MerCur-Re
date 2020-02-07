@@ -17,7 +17,7 @@ import datetime
 import io
 import os
 import uuid
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, Union, cast
 
 import gin
 import gym
@@ -258,7 +258,10 @@ class MaximumDuration(Wrapper):
         self._step += 1
         if self._step >= self._duration:
             done = True
+            info['timeout'] = True
             self._step = None
+        else:
+            info.setdefault('timeout', False)
         return observ, reward, done, info
 
     def reset(self) -> Observations:
@@ -341,6 +344,10 @@ class CollectGymDataset(Wrapper):
             # Optional items
             if key in info:
                 transition[key] = info[key]
+        if done and not info.get('timeout', False):
+            transition['done'] = 1.0
+        else:
+            transition['done'] = 0.0
         self._episode.append(transition)
         if done:
             episode = self._get_episode()
@@ -349,18 +356,18 @@ class CollectGymDataset(Wrapper):
                 self._write(episode, filename)
         return observ, reward, done, info
 
-    def reset(self) -> Observations:
+    def reset(self) -> Dict[str, Union[float, np.ndarray]]:
         # Resetting the environment provides the observation for time step zero.
         # The action and reward are not known for this time step, so we zero them.
         observ = super().reset()
-        transition: Dict[str, Any] = self._process_observ(observ).copy()
+        transition = self._process_observ(observ).copy()
         self._episode = [transition]
         return observ
 
-    def _process_observ(self, observ: Observations) -> Observations:
+    def _process_observ(self, observ: Observations) -> Dict[str, Union[float, np.ndarray]]:
         if not isinstance(observ, dict):
             observ = {'observ': observ}
-        return observ
+        return cast(Dict[str, Union[float, np.ndarray]], observ)
 
     def _get_filename(self) -> str:
         assert self._outdir is not None

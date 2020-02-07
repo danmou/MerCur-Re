@@ -15,7 +15,7 @@ from project import networks
 from project.util.files import get_latest_checkpoint
 from project.util.system import is_debugging
 from project.util.tf import auto_shape
-from project.util.tf.losses import mse
+from project.util.tf.losses import binary_crossentropy, mse
 from project.util.timing import measure_time
 
 
@@ -47,10 +47,16 @@ class Model(auto_shape.Model):
             keys=list(observation_components)
         )
         self.decoders = {'image': networks.ExtraBatchDim(networks.Decoder(), name='image_decoder')}
-        for key in sorted(additional_observations | {'reward'}):
+        self.loss_fns: Dict[str, Any] = {'image': mse}
+        for key in sorted(additional_observations | {'reward', 'done'}):
             data_shape = data_spec[key].shape[2:].as_list()
-            self.decoders[key] = self._get_vector_decoder(data_shape,
-                                                          name=f'{key}_decoder')
+            if key == 'done':
+                self.loss_fns[key] = binary_crossentropy
+                kwargs = {'activation': 'sigmoid'}
+            else:
+                self.loss_fns[key] = mse
+                kwargs = {}
+            self.decoders[key] = self._get_vector_decoder(data_shape, **kwargs, name=f'{key}_decoder')
         # Layers in a dict are not automatically tracked, so we add them manually
         for layer in self.decoders.values():
             self._layers.append(layer)
@@ -123,16 +129,17 @@ class Model(auto_shape.Model):
             reconstructions[name] = decoder(state_features, **kwargs)
         return reconstructions
 
-    def call(self, inputs: Mapping[str, tf.Tensor]) -> tf.Tensor:
+    def call(self, inputs: Mapping[str, tf.Tensor], **kwargs: Any) -> tf.Tensor:
         inputs = dict(inputs)  # Shallow copy input dict so we can modify it safely
         if self._batch_size and tf.nest.flatten(inputs)[0].shape[0] is None:
             # Workaround for keras making the batch dimension undefined
             tf.nest.map_structure(lambda x: x.set_shape([self._batch_size] + x.shape[1:]), inputs)
         if inputs['length'].shape.ndims > 1:
             inputs['length'] = inputs['length'][:, 0]
-        prior, posterior = self.closed_loop(inputs)
-        reconstructions = self.decode(self.rnn.state_to_features(posterior))
         mask = self._get_mask(inputs)
+        prior, posterior = self.closed_loop(inputs, **kwargs)
+        features = self.rnn.state_to_features(posterior)
+        reconstructions = self.decode(features, **kwargs)
         reconstruction_loss = self.reconstruction_loss(inputs, reconstructions, mask)
         # Note: `add_loss` must be called directly from the `call` method
         self.add_loss(reconstruction_loss, inputs=True)
@@ -149,9 +156,10 @@ class Model(auto_shape.Model):
                             ) -> tf.Tensor:
         total = tf.constant(0.0)
         for name, reconstruction in reconstructions.items():
+            assert name in scales, f'No reconstruction loss scale specified for {name!r}'
             target = targets[name]
             scale = scales[name]
-            loss = mse(reconstruction, target, mask, name=f'{name}_reconstruction_loss')
+            loss = self.loss_fns[name](reconstruction, target, mask, name=f'{name}_reconstruction_loss')
             self.add_metric(loss, aggregation='mean', name=f'{name}_recon')
             total += scale * loss
         return total
