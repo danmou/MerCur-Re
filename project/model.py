@@ -14,12 +14,13 @@ from loguru import logger
 from project import networks
 from project.util.files import get_latest_checkpoint
 from project.util.system import is_debugging
-from project.util.tf import auto_shape
+from project.util.tf import auto_shape, combine_dims, swap_dims
+from project.util.tf.discounting import lambda_return
 from project.util.tf.losses import binary_crossentropy, mse
 from project.util.timing import measure_time
 
 
-@gin.configurable(whitelist=['predictor_class', 'rnn_class', 'disable_tf_optimization'])
+@gin.configurable(whitelist=['predictor_class', 'rnn_class', 'dreamer', 'disable_tf_optimization'])
 class Model(auto_shape.Model):
     """This class defines the top-level model structure and losses"""
     def __init__(self,
@@ -27,9 +28,10 @@ class Model(auto_shape.Model):
                  data_spec: Mapping[str, tf.TensorSpec],
                  predictor_class: Type[networks.predictors.Predictor] = gin.REQUIRED,
                  rnn_class: Type[networks.rnns.RNN] = gin.REQUIRED,
+                 dreamer: bool = False,
                  disable_tf_optimization: bool = False,
                  ) -> None:
-        super().__init__(batch_dims=2)
+        super().__init__(batch_dims=2, min_batch_shape=[1, 2])
         self._observation_components = list(observation_components)
         self._data_spec = data_spec
         self._batch_size = next(iter(data_spec.values())).shape[0]
@@ -52,7 +54,7 @@ class Model(auto_shape.Model):
             data_shape = data_spec[key].shape[2:].as_list()
             if key == 'done':
                 self.loss_fns[key] = binary_crossentropy
-                kwargs = {'activation': 'sigmoid'}
+                kwargs = {'output_activation': 'sigmoid'}
             else:
                 self.loss_fns[key] = mse
                 kwargs = {}
@@ -63,12 +65,57 @@ class Model(auto_shape.Model):
         self._track_layers(self._layers)
         self.rnn = rnn_class(predictor_class)
 
+        self._dreamer = dreamer
+        if dreamer:
+            self.action_network = self._get_action_network(data_spec['action'].shape[2:].as_list())
+            self.value_network = self._get_value_network()
+        else:
+            self.action_network = None
+            self.value_network = None
+
+    @gin.configurable('Model.action_network', whitelist=['num_units', 'num_layers', 'activation', 'batch_norm'])
+    def _get_action_network(self,
+                            action_shape: Sequence[int],
+                            num_units: int = gin.REQUIRED,
+                            num_layers: int = gin.REQUIRED,
+                            activation: Union[None, str, Type[tf.keras.layers.Layer]] = auto_shape.ReLU,
+                            batch_norm: bool = False,
+                            name: str = 'action_network'
+                            ) -> auto_shape.Layer:
+        return auto_shape.Sequential([networks.ExtraBatchDim(networks.SequentialBlock(num_units=num_units,
+                                                                                      num_layers=num_layers,
+                                                                                      activation=activation,
+                                                                                      batch_norm=batch_norm,
+                                                                                      name=f'{name}_block'),
+                                                             name=f'{name}_block_ebd'),
+                                      networks.TanhNormalTanh(action_shape,
+                                                              extra_batch_dim=True,
+                                                              name=f'{name}_dist')],
+                                     batch_dims=2,
+                                     name=name)
+
+    @gin.configurable('Model.value_network', whitelist=['num_units', 'num_layers', 'activation', 'batch_norm'])
+    def _get_value_network(self,
+                           num_units: int = gin.REQUIRED,
+                           num_layers: int = gin.REQUIRED,
+                           activation: Union[None, str, Type[tf.keras.layers.Layer]] = auto_shape.ReLU,
+                           batch_norm: bool = False,
+                           name: str = 'value_network'
+                           ) -> auto_shape.Layer:
+        return cast(auto_shape.Layer, self._get_vector_decoder(output_shape=[],
+                                                               num_units=num_units,
+                                                               num_layers=num_layers,
+                                                               activation=activation,
+                                                               batch_norm=batch_norm,
+                                                               name=name))
+
     @staticmethod
     @gin.configurable('Model.decoders', whitelist=['num_units', 'num_layers', 'activation', 'batch_norm'])
     def _get_vector_decoder(output_shape: Sequence[int],
                             num_units: int = gin.REQUIRED,
                             num_layers: int = gin.REQUIRED,
                             activation: Union[None, str, Type[tf.keras.layers.Layer]] = auto_shape.ReLU,
+                            output_activation: Union[None, str, Type[tf.keras.layers.Layer]] = None,
                             batch_norm: bool = False,
                             name: str = 'vector_encoder'
                             ) -> auto_shape.Layer:
@@ -78,7 +125,7 @@ class Model(auto_shape.Model):
                                                                                       batch_norm=batch_norm,
                                                                                       name=f'{name}_block'),
                                                              networks.ShapedDense(output_shape,
-                                                                                  activation=None,
+                                                                                  activation=output_activation,
                                                                                   name=f'{name}_shaped_dense')],
                                                             name=f'{name}_sequential'),
                                       name=name)
@@ -143,7 +190,75 @@ class Model(auto_shape.Model):
         reconstruction_losses = self.reconstruction_loss(inputs, reconstructions, mask)
         for name, (loss, scale) in reconstruction_losses.items():
             self.add_named_loss(loss, name=f'{name}_recon', scaling=scale)
+
+        if self._dreamer:
+            imagined_states = self.imagine_forward(posterior)
+            imagined_features = self.rnn.state_to_features(imagined_states)
+            values = self.value_network(imagined_features, **kwargs)
+            rewards = self.decoders['reward'](imagined_features, **kwargs)
+            done_probs = self.decoders['done'](imagined_features, **kwargs)
+            action_return = self.compute_action_return(values, rewards, done_probs)
+            value_loss = self.compute_value_loss(values, rewards, done_probs)
+            self.add_named_loss(action_return, name='action_return', scaling=-1.0, layer=self.action_network)
+            # TODO: See if removing the layer constraint on value loss helps
+            self.add_named_loss(value_loss, name='value_loss', scaling=1.0, layer=self.value_network)
+
         return tf.constant(0.0)
+
+    @gin.configurable(whitelist=['horizon'])
+    def imagine_forward(self, initial_states: Tuple[tf.Tensor, ...], horizon: int = 15, **kwargs: Any) -> Tuple[tf.Tensor, ...]:
+        initial_states = tf.nest.map_structure(lambda x: tf.stop_gradient(x[:, :-1]), initial_states)
+        initial_states = combine_dims(initial_states, start=0, end=2)  # type: ignore[assignment]
+
+        def step_fn(prev: Tuple[tf.Tensor, ...], index: tf.Tensor) -> Tuple[tf.Tensor, ...]:
+            features = tf.stop_gradient(self.rnn.state_to_features(prev))
+            action = self.action_network(features[tf.newaxis, :], **kwargs).sample()[0, :]
+            _, state = self.rnn.predictor.open_loop_predictor(action, prev)
+            return cast(Tuple[tf.Tensor, ...], state)
+
+        states = tf.scan(step_fn, tf.range(horizon), initial_states, back_prop=True)
+        states = swap_dims(states, 0, 1)
+        return cast(Tuple[tf.Tensor, ...], states)
+
+    @gin.configurable(whitelist=['lambda_'])
+    def compute_action_return(self,
+                              values: tf.Tensor,
+                              rewards: tf.Tensor,
+                              done_probs: tf.Tensor,
+                              lambda_: float = 1.0,
+                              ) -> tf.Tensor:
+        rewards = rewards[:, :-1]
+        values = values[:, :-1]
+        discounts = 1 - done_probs[:, :-1]
+        final_value = values[:, -1]
+        return_ = lambda_return(rewards, values, discounts, lambda_, final_value, axis=1, stop_gradient=False)
+
+        # TODO: Check if this helps
+        return_ *= self.discount_factors(discounts)
+        return tf.reduce_mean(return_)
+
+    @gin.configurable(whitelist=['lambda_'])
+    def compute_value_loss(self,
+                           values: tf.Tensor,
+                           rewards: tf.Tensor,
+                           done_probs: tf.Tensor,
+                           lambda_: float = 1.0,
+                           ) -> tf.Tensor:
+        rewards = rewards[:, :-1]
+        values = values[:, :-1]
+        discounts = tf.stop_gradient(1 - done_probs[:, :-1])
+        final_value = values[:, -1]
+        return_ = lambda_return(rewards, values, discounts, lambda_, final_value, axis=1, stop_gradient=True)
+        loss = mse(values, return_, reduce=False)
+
+        # TODO: Check if this helps
+        loss *= self.discount_factors(discounts)
+        return tf.reduce_mean(loss)
+
+    @staticmethod
+    def discount_factors(discounts: tf.Tensor) -> tf.Tensor:
+        """[1, gamma, gamma**2, ...]"""
+        return tf.stop_gradient(tf.math.cumprod(tf.concat([tf.ones_like(discounts[:, :1]), discounts[:, :-1]], 1), 1))
 
     @gin.configurable(whitelist=['scales'])
     @tf.function(experimental_relax_shapes=True)
@@ -175,15 +290,17 @@ class Model(auto_shape.Model):
 
 
 @measure_time
-@gin.configurable(whitelist=['optimizer'])
+@gin.configurable(whitelist=['optimizers'])
 def get_model(observation_components: Iterable[str],
               data_spec: Mapping[str, tf.TensorSpec],
-              optimizer: tf.keras.optimizers.Optimizer,
+              optimizers: Mapping[str, tf.keras.optimizers.Optimizer],
               ) -> Model:
     """Returns a built model with random weights"""
+    assert 'model' in optimizers.keys(), 'No optimizer specified for base model'
     logger.info(f'Building model...')
     model = Model(observation_components, data_spec)
-    model.compile(optimizer=optimizer, loss=None)
+    model.compile(optimizer=list(optimizers.values()), loss=None)
+    model.optimizer_targets = list(optimizers.keys())
     model.build_with_input(model.dummy_data)  # Initialize weights
     model.reset_metrics()
     return model

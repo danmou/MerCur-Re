@@ -10,7 +10,7 @@ import tensorflow as tf
 
 from project.networks.predictors import Predictor
 from project.util.tf import auto_shape
-from project.util.tf.losses import apply_mask
+from project.util.tf.losses import reduce_loss
 
 
 class RNN(abc.ABC, auto_shape.Layer):
@@ -81,7 +81,7 @@ class RNN(abc.ABC, auto_shape.Layer):
         divergence_loss = self.state_divergence(posterior, prior, mask)
         if free_nats:
             divergence_loss = tf.maximum(0.0, divergence_loss - float(free_nats))
-        divergence_loss = apply_mask(divergence_loss, mask, name='divergence_loss')
+        divergence_loss = reduce_loss(divergence_loss, mask, name='divergence_loss')
         return divergence_loss
 
 

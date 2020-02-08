@@ -24,12 +24,14 @@ class PrettyPrinter:
         self.log_fn(self.separator.join(self.header.values()))
 
     def print_row(self, row: Mapping[str, Union[str, SupportsFloat]]) -> None:
-        row_values = [row[k] for k in self.header.keys()]
+        row_values = [row.get(k) for k in self.header.keys()]
         row_strings = [self.format_number(v, l) for v, l in zip(row_values, self.widths)]
         self.log_fn(self.separator.join(row_strings))
 
     @staticmethod
-    def format_number(num: Union[str, SupportsFloat], length: int) -> str:
+    def format_number(num: Union[str, SupportsFloat, None], length: int) -> str:
+        if num is None:
+            num = ''
         if isinstance(num, str):
             return f'{num:{length}.{length}s}'  # truncates if string is too long
         num = float(num)

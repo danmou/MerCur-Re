@@ -83,7 +83,6 @@ def train(logdir: Path,
         tf.keras.callbacks.TensorBoard(log_dir=str(logdir / 'tb_logs'),
                                        write_graph=True,
                                        profile_batch=2,
-                                       write_grads=True,  # currently no effect, see https://github.com/tensorflow/tensorflow/issues/31173
                                        histogram_freq=0,
                                        update_freq='epoch'),
         CheckpointCallback(filepath=str(logdir / 'checkpoint_epoch_{epoch:03d}_loss_{val_loss:.2f}.h5'),
@@ -180,10 +179,12 @@ def run_one_epoch(model: tf.keras.Model,
     return metrics
 
 
+@gin.configurable(whitelist=['gradient_clip_norm'])
 @tf.function
 def run_on_batch(model: tf.keras.Model,
                  inputs: Mapping[str, tf.Tensor],
                  training: bool = False,
+                 gradient_clip_norm: Optional[float] = None,
                  ) -> Dict[str, tf.Tensor]:
     """Runs a single training or validation step on a single batch of data."""
     inputs = {key: reshape_known_dims(tf.cast(inputs[key], spec.dtype), spec.shape)
@@ -192,16 +193,27 @@ def run_on_batch(model: tf.keras.Model,
         model(inputs, training=training)
         losses = model.per_layer_losses
         total_loss = model.total_loss
-    if training:
-        gradients: Dict[Any, tf.Tensor] = {}
-        for layer, loss in losses.items():
-            variables = layer.trainable_variables
-            grads = tape.gradient(loss, variables)
-            for var, grad in zip(variables, grads):
-                if grad is not None:
-                    ref = var.experimental_ref()
-                    gradients[ref] = gradients.get(ref, 0.0) + grad
-        model.optimizer.apply_gradients(zip(gradients.values(), (var.deref() for var in gradients.keys())))
     metrics = {'loss': total_loss}
     metrics.update({m.name: m.result() for m in model.metrics})
+    if training:
+        optimizers = dict(zip(model.optimizer_targets, model.optimizer))
+        gradients_per_optimizer: Dict[str, Dict[Any, tf.Tensor]] = {optimizer_name: {} for optimizer_name in optimizers.keys()}
+        for layer, loss in losses.items():
+            variables = layer.trainable_variables
+            optimizer_name = layer.name if layer.name in gradients_per_optimizer.keys() else 'model'
+            gradients = tape.gradient(loss, variables)
+            for var, grad in zip(variables, gradients):
+                if grad is not None:
+                    ref = var.experimental_ref()
+                    gradients_per_optimizer[optimizer_name][ref] = gradients_per_optimizer.get(ref, 0.0) + grad
+        for optimizer_name, gradients in gradients_per_optimizer.items():
+            if not gradients:
+                logger.warning(f'No gradients for optimizer {optimizer_name}')
+                continue
+            vars_ = list(var.deref() for var in gradients.keys())
+            grads = list(gradients.values())
+            if gradient_clip_norm:
+                grads, norm = tf.clip_by_global_norm(grads, gradient_clip_norm)
+                metrics[f'grad_norm_{optimizer_name}'] = norm
+            optimizers[optimizer_name].apply_gradients(zip(grads, vars_))
     return metrics

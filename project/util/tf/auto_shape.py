@@ -8,6 +8,7 @@ import gin
 import tensorflow as tf
 from tensorflow.keras import layers
 from tensorflow.python.training.tracking.layer_utils import filter_empty_layer_containers
+from tensorflow_probability import distributions as tfd
 
 from project.util.typing import Nested
 
@@ -45,8 +46,13 @@ class AutoShapeMixin:
             kwargs['mask'] = tf.ones(self.min_batch_shape, tf.bool)
         kwargs['training'] = False
         dummy_output = super().__call__(dummy_input, *args, **kwargs)  # type: ignore[misc]  # mypy/issues/5887
-        self._output_spec = tf.nest.map_structure(lambda x: layers.InputSpec(shape=[None] * bd + x.shape[bd:],
-                                                                             dtype=x.dtype), dummy_output)
+        # if isinstance(tf.nest.flatten(dummy_output)[0], tf.Tensor):
+        if isinstance(dummy_output, tfd.Distribution):
+            self._output_spec = layers.InputSpec(shape=[None] * len(dummy_output.batch_shape) + dummy_output.event_shape,
+                                                 dtype=dummy_output.dtype)
+        else:
+            self._output_spec = tf.nest.map_structure(lambda x: layers.InputSpec(shape=[None] * bd + x.shape[bd:],
+                                                                                 dtype=x.dtype), dummy_output)
         self.built_with_input = True
 
     def __call__(self, inputs: Nested[tf.Tensor], *args: Any, **kwargs: Any) -> Any:
@@ -72,22 +78,26 @@ class AutoShapeMixin:
 
     @property
     def input_shape(self) -> Nested[tf.TensorShape]:
-        assert self.input_spec is not None, 'build_with_input has not been called; input shape is not defined'
+        assert self.input_spec is not None, (f'build_with_input has not been called for layer {self.name}; '  # type: ignore[attr-defined]
+                                             'input shape is not defined')
         return tf.nest.map_structure(lambda x: x.shape, self.input_spec)
 
     @property
     def output_shape(self) -> Nested[tf.TensorShape]:
-        assert self.output_spec is not None, 'build_with_input has not been called; output shape is not defined'
+        assert self.output_spec is not None, (f'build_with_input has not been called for layer {self.name}; '  # type: ignore[attr-defined]
+                                              'output shape is not defined')
         return tf.nest.map_structure(lambda x: x.shape, self.output_spec)
 
     @property
     def input_dtype(self) -> Nested[tf.TensorShape]:
-        assert self.input_spec is not None, 'build_with_input has not been called; input dtype is not defined'
+        assert self.input_spec is not None, (f'build_with_input has not been called for layer {self.name}; '  # type: ignore[attr-defined]
+                                             'input dtype is not defined')
         return tf.nest.map_structure(lambda x: x.dtype, self.input_spec)
 
     @property
     def output_dtype(self) -> Nested[tf.TensorShape]:
-        assert self.output_spec is not None, 'build_with_input has not been called; output dtype is not defined'
+        assert self.output_spec is not None, (f'build_with_input has not been called for layer {self.name}; '  # type: ignore[attr-defined]
+                                              'output dtype is not defined')
         return tf.nest.map_structure(lambda x: x.dtype, self.output_spec)
 
     def compute_output_shape(self, input_shape: Nested[tf.TensorShape]) -> Nested[tf.TensorShape]:

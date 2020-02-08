@@ -39,6 +39,8 @@ reconstruction_loss.scales = {
     'goal': 1.0,
     'done': 0.5,
 }
+compute_value_loss.lambda_ = 0.95
+compute_action_return.lambda_ = 0.95
 
 # Model complexity
 Model.predictor_class = @predictors.RSSMPredictor
@@ -60,14 +62,25 @@ Model.decoders.num_units = 400  # used for reward, done and goal prediction
 Model.decoders.activation = @auto_shape.ReLU
 Encoder.activation = @auto_shape.ReLU
 Decoder.activation = @auto_shape.ReLU
+Model.action_network.num_layers = 4
+Model.action_network.num_units = 400
+Model.action_network.activation = @auto_shape.ReLU
+Model.value_network.num_layers = 3
+Model.value_network.num_units = 400
+Model.value_network.activation = @auto_shape.ReLU
 training.batch_shape = (64, 64)  # [batch_size, time_batch]
+Model.dreamer = True
+imagine_forward.horizon = 15
 
 # Optimizer
-get_model.optimizer = @optimizers.with_global_norm_clipping()
-optimizers.with_global_norm_clipping.clip_norm = 1000.0
-optimizers.with_global_norm_clipping.optimizer = @tf.keras.optimizers.Adam()
-tf.keras.optimizers.Adam.learning_rate = 1e-3
+get_model.optimizers = {'model': @tf.keras.optimizers.Adam(),
+                        'action_network': @action/tf.keras.optimizers.Adam(),
+                        'value_network': @value/tf.keras.optimizers.Adam()}
+tf.keras.optimizers.Adam.learning_rate = 6e-4
 tf.keras.optimizers.Adam.epsilon = 1e-4
+action/tf.keras.optimizers.Adam.learning_rate = 8e-5
+value/tf.keras.optimizers.Adam.learning_rate = 8e-5
+run_on_batch.gradient_clip_norm = 100.0
 
 # Planner
 MPCAgent.planner = @CrossEntropyMethod
