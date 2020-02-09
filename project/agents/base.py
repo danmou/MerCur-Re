@@ -15,7 +15,7 @@ Observations = Union[tf.Tensor, Dict[str, tf.Tensor]]
 
 class Agent(abc.ABC):
     def __init__(self, action_space: gym.Space) -> None:
-        self._action_space = action_space
+        self.action_space = action_space
 
     def reset(self) -> None:
         """Reset agent's state"""
@@ -74,7 +74,7 @@ class ModelBasedAgent(Agent):
     def observe(self, observations: Observations, action: Optional[tf.Tensor]) -> None:
         """Update model state based on observations."""
         if action is None:
-            action = tf.zeros_like(self._action_space.low)
+            action = tf.zeros_like(self.action_space.low)
         observations = tf.nest.map_structure(lambda t: t[tf.newaxis, tf.newaxis, :], observations)
         embedded = self._encoder(observations, training=False)[0]
         action = action[tf.newaxis, :]

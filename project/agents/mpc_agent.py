@@ -31,7 +31,7 @@ class MPCAgent(ModelBasedAgent):
         assert isinstance(action_space, gym.spaces.Box), f'Unsupported action space {action_space}'
         super().__init__(action_space, model)
         self._objective_decoder = model.decoders[objective]
-        self._planner = planner.from_rnn(model.rnn, self._objective_fn, self._action_space)
+        self._planner = planner.from_rnn(model.rnn, self._objective_fn, self.action_space)
         self._exploration_noise = exploration_noise
         self._goal = tf.Variable([0.0, 0.0])
         self._visualize = tf.Variable(visualize)

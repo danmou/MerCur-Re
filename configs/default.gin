@@ -82,7 +82,10 @@ action/tf.keras.optimizers.Adam.learning_rate = 8e-5
 value/tf.keras.optimizers.Adam.learning_rate = 8e-5
 run_on_batch.gradient_clip_norm = 100.0
 
-# Planner
+# Agent and planner
+training.agent_cls = @MPCAgent
+get_evaluation_agent.agent_cls = None  # If None, the training agent is reused
+MPCAgent.objective = 'reward'
 MPCAgent.planner = @CrossEntropyMethod
 # MPCAgent.planner = @HierarchicalCrossEntropyMethod
 CrossEntropyMethod.horizon = 12

@@ -3,7 +3,7 @@
 # (C) 2019, Daniel Mouritzen
 
 from pathlib import Path
-from typing import Any, Dict, Iterator, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterator, Mapping, Optional, Sequence, Tuple, Type
 
 import gin
 import tensorflow as tf
@@ -12,7 +12,7 @@ from tensorflow.python.keras.callbacks import configure_callbacks
 from tensorflow.python.keras.engine.training_v2 import TrainingContext
 from tensorflow.python.keras.utils.mode_keys import ModeKeys
 
-from project.agents import MPCAgent, RandomAgent
+from project.agents import ModelBasedAgent, RandomAgent
 from project.model import get_model, restore_model
 from project.tasks import Task
 from project.util.files import link_directory_contents
@@ -26,13 +26,13 @@ from project.util.tf.callbacks import (CheckpointCallback,
                                        WandbCommitCallback)
 from project.util.timing import measure_time
 
-from .evaluator import Evaluator
+from .evaluator import Evaluator, get_evaluation_agent
 from .simulator import Simulator
 
 
 @measure_time
 @gin.configurable('training', whitelist=['tasks', 'num_seed_episodes', 'num_epochs', 'train_steps', 'test_steps',
-                                         'batch_shape'])
+                                         'batch_shape', 'agent_cls'])
 def train(logdir: Path,
           initial_data: Optional[str],
           checkpoint: Optional[Path] = None,
@@ -42,6 +42,7 @@ def train(logdir: Path,
           train_steps: int = gin.REQUIRED,
           test_steps: int = gin.REQUIRED,
           batch_shape: Tuple[int, int] = (64, 64),
+          agent_cls: Type[ModelBasedAgent] = gin.REQUIRED,
           ) -> None:
     logger.info('Creating training environments.')
     sims = {task.name: Simulator(task) for task in tasks}
@@ -75,7 +76,9 @@ def train(logdir: Path,
     # model.encoder.layer.layer._image_enc.summary(line_length=100, print_fn=logger.debug)
     # model.decoders['image'].layer._decoder.summary(line_length=100, print_fn=logger.debug)
 
-    agents = {task_name: MPCAgent(sim.action_space, model, objective='reward') for task_name, sim in sims.items()}
+    train_agents = {task_name: agent_cls(sim.action_space, model) for task_name, sim in sims.items()}
+    eval_agents = {task_name: get_evaluation_agent(agent.action_space, model, train_agent=agent)
+                   for task_name, agent in train_agents.items()}
 
     logger.info('Training...')
     callbacks = [
@@ -87,8 +90,8 @@ def train(logdir: Path,
                                        update_freq='epoch'),
         CheckpointCallback(filepath=str(logdir / 'checkpoint_epoch_{epoch:03d}_loss_{val_loss:.2f}.h5'),
                            verbose=1),
-        DataCollectionCallback(sims, agents, dataset_dirs),
-        EvaluateCallback(evaluator, agents),
+        DataCollectionCallback(sims, train_agents, dataset_dirs),
+        EvaluateCallback(evaluator, eval_agents),
         PredictionSummariesCallback(model, dataset_dirs),
         WandbCommitCallback(),
     ]
