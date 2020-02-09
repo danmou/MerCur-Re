@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Tuple, Type, Union, cast
 
 import gin
+import numpy as np
 import tensorflow as tf
 from loguru import logger
 
@@ -306,6 +307,7 @@ def get_model(observation_components: Iterable[str],
     return model
 
 
+@measure_time
 def restore_model(checkpoint: Path, base_dir: Optional[Path] = None) -> Tuple[Model, int]:
     """Returns a fully initialized model and the index of the next epoch"""
     checkpoint = get_latest_checkpoint(checkpoint, base_dir)
@@ -321,5 +323,13 @@ def restore_model(checkpoint: Path, base_dir: Optional[Path] = None) -> Tuple[Mo
         additional_data = pickle.load(f)
     model = get_model(**additional_data)
     logger.info(f'Restoring weights from {checkpoint}...')
-    measure_time(model.load_weights)(str(checkpoint))
+    # Model.load_weights with by_name=True will silently ignore if any weights are missing from the checkpoint,
+    # so we have to save the current weights so we can see if they changed.
+    initial_weights = [layer.get_weights() for layer in model.layers]
+    measure_time(model.load_weights)(str(checkpoint), by_name=True)
+    # Check if weights were loaded for all layers
+    for layer, initial in zip(model.layers, initial_weights):
+        weights = layer.get_weights()
+        if weights and all(tf.nest.flatten(tf.nest.map_structure(np.array_equal, weights, initial))):
+            logger.warning(f'Checkpoint contained no weights for layer {layer.name}!')
     return model, epoch
