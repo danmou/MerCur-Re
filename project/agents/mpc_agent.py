@@ -11,11 +11,11 @@ import tensorflow as tf
 from project.model import Model
 from project.planning import Planner
 
-from .base import Agent, Observations
+from .base import ModelBasedAgent, Observations
 
 
-@gin.configurable(whitelist=['objective', 'planner'])
-class MPCAgent(Agent):
+@gin.configurable(whitelist=['objective', 'planner', 'exploration_noise', 'visualize'])
+class MPCAgent(ModelBasedAgent):
     """
     At each time step, uses a predictive model together with a planning algorithm to choose the best sequence of
     actions and executes the first one.
@@ -29,11 +29,8 @@ class MPCAgent(Agent):
                  visualize: bool = False,
                  ) -> None:
         assert isinstance(action_space, gym.spaces.Box), f'Unsupported action space {action_space}'
-        super().__init__(action_space)
-        self._predictor = model.rnn.predictor
-        self._encoder = model.encoder
+        super().__init__(action_space, model)
         self._objective_decoder = model.decoders[objective]
-        self._state = tuple(tf.Variable(x) for x in self._predictor.zero_state(1, tf.float32))
         self._planner = planner.from_rnn(model.rnn, self._objective_fn, self._action_space)
         self._exploration_noise = exploration_noise
         self._goal = tf.Variable([0.0, 0.0])
@@ -42,18 +39,6 @@ class MPCAgent(Agent):
     def _objective_fn(self, state: Tuple[tf.Tensor, ...]) -> tf.Tensor:
         obj = self._objective_decoder(self._predictor.state_to_features(state), training=False)
         return tf.reduce_sum(obj, axis=1)
-
-    @property
-    def state(self) -> Tuple[tf.Variable, ...]:
-        return self._state
-
-    @state.setter  # type: ignore[misc]  # mypy/issues/1362
-    @tf.function
-    def state(self, value: Tuple[tf.Tensor, ...]) -> None:
-        tf.nest.assert_same_structure(value, self._state)
-        assert all(a.shape == b.shape for a, b in zip(value, self._state))
-        for s, v in zip(self._state, value):
-            s.assign(v)
 
     @property
     def visualize(self) -> tf.Variable:
@@ -65,20 +50,9 @@ class MPCAgent(Agent):
         self._visualize.assign(value)
 
     @tf.function
-    def reset(self) -> None:
-        self.state = tuple(tf.zeros_like(s) for s in self.state)  # type: ignore[misc]  # mypy/issues/1362
-
-    @tf.function
     def observe(self, observations: Observations, action: Optional[tf.Tensor]) -> None:
-        if action is None:
-            action = tf.zeros_like(self._action_space.low)
+        super().observe(observations, action)
         self._goal.assign(observations['goal'])
-        observations = tf.nest.map_structure(lambda t: t[tf.newaxis, tf.newaxis, :], observations)
-        embedded = self._encoder(observations, training=False)[0]
-        action = action[tf.newaxis, :]
-        use_obs = tf.constant([[True]])
-        state = tuple(v.value() for v in self._state)  # This is needed to prevent weird errors with dead weakrefs
-        _, self.state = self._predictor((embedded, action, use_obs), state, training=False)  # type: ignore[misc]  # mypy/issues/1362
 
     @tf.function
     def act(self) -> tf.Tensor:
