@@ -83,8 +83,12 @@ value/tf.keras.optimizers.Adam.learning_rate = 8e-5
 run_on_batch.gradient_clip_norm = 100.0
 
 # Agent and planner
-training.agent_cls = @MPCAgent
-get_evaluation_agent.agent_cls = None  # If None, the training agent is reused
+# training.agent_cls = @MPCAgent
+# get_evaluation_agent.agent_cls = None  # If None, the training agent is reused
+training.agent_cls = @train/PolicyNetworkAgent
+get_evaluation_agent.agent_cls = @eval/PolicyNetworkAgent
+train/PolicyNetworkAgent.sample = True
+eval/PolicyNetworkAgent.sample = False
 MPCAgent.objective = 'reward'
 MPCAgent.planner = @CrossEntropyMethod
 # MPCAgent.planner = @HierarchicalCrossEntropyMethod
