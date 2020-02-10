@@ -314,6 +314,7 @@ class PadActions(Wrapper):
         return gym.spaces.Box(low, high, dtype=np.float32)
 
 
+@gin.configurable(whitelist=['rejection_metric', 'rejection_threshold'])
 class CollectGymDataset(Wrapper):
     """Collect transition tuples and store episodes as Numpy files.
 
@@ -328,12 +329,22 @@ class CollectGymDataset(Wrapper):
     The first transition tuple contains the observation returned from resetting
     the environment, together with zeros for the action and reward. Thus, the
     episode length is one more than the number of decision points.
+
+    If rejection_metric is specified, only episodes for which the specified metric
+    exceeds rejection_threshold are saved.
     """
 
-    def __init__(self, env: gym.Env, outdir: Optional[str]) -> None:
+    def __init__(self,
+                 env: gym.Env,
+                 outdir: Optional[str],
+                 rejection_metric: Optional[str] = None,
+                 rejection_threshold: float = 0.0,
+                 ) -> None:
         super().__init__(env)
         self._outdir = outdir and os.path.expanduser(outdir)
         self._episode: List[Dict[str, Any]] = []
+        self._rejection_metric = rejection_metric
+        self._rejection_threshold = rejection_threshold
 
     def step(self, action: Action) -> ObsTuple:
         observ, reward, done, info = super().step(action)
@@ -349,7 +360,7 @@ class CollectGymDataset(Wrapper):
         else:
             transition['done'] = 0.0
         self._episode.append(transition)
-        if done:
+        if done and self._should_keep_episode(info):
             episode = self._get_episode()
             if self._outdir:
                 filename = self._get_filename()
@@ -363,6 +374,9 @@ class CollectGymDataset(Wrapper):
         transition = self._process_observ(observ).copy()
         self._episode = [transition]
         return observ
+
+    def _should_keep_episode(self, info: Dict[str, Any]) -> bool:
+        return not self._rejection_metric or float(info[self._rejection_metric]) > self._rejection_threshold
 
     def _process_observ(self, observ: Observations) -> Dict[str, Union[float, np.ndarray]]:
         if not isinstance(observ, dict):
