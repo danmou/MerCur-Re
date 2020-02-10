@@ -98,8 +98,16 @@ Extracting episodes from a specific environment and saving as new dataset:
 ```bash
 split=val; gzip -dc data/datasets/pointnav/habitat-test-scenes/v1/${split}/${split}.json.gz | jq '{episodes: [.episodes[] | select(.scene_id | contains("castle"))]}' | gzip > data/datasets/pointnav/habitat-test-scenes/v1/${split}/${split}_castle.json.gz
 ```
+Extracting specific number of random episodes and saving as new dataset:
 ```bash
 gzip -dc data/datasets/pointnav/habitat-test-scenes/v1/val/val.json.gz | jq '{episodes: [([.episodes[] | select(.scene_id | contains("castle")) | select(.episode_id | tonumber | . % 3 == 0)] | .[0:15])[], ([.episodes[] | select(.scene_id | contains("gogh")) | select(.episode_id | tonumber | . % 3 == 0)] | .[0:15])[]]}' | gzip > data/datasets/pointnav/habitat-test-scenes/v1/val_mini/val_mini.json.gz
+```
+Generating dataset of only short episodes:
+```bash
+for F in $(ls data/datasets/pointnav/gibson/v1/train/content/*.json.gz); do
+    gzip -dc $F | jq '{episodes: [.episodes[] | select(.info.geodesic_distance < 2.0)]}' | gzip > $(echo $F | sed s/train/train_short/g)
+done
+cp data/datasets/pointnav/gibson/v1/train/train.json.gz data/datasets/pointnav/gibson/v1/train_short/train_short.json.gz
 ```
 Calculating 5th, 50th and 95th percentiles of geodesic distances:
 ```bash
