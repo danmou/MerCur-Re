@@ -21,28 +21,12 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.layers import RNN, AbstractRNNCell
+from tensorflow.keras.layers import RNN
 
 from project.networks.predictors import OpenLoopPredictor
+from project.util.tf import scan
 
 from .base import Planner
-
-
-class SimulationRNNCell(AbstractRNNCell):
-    """Simple idealized simulation cell for visualization"""
-    def __init__(self) -> None:
-        super().__init__()
-
-    @property
-    def state_size(self) -> int:
-        return 3
-
-    def call(self, action: tf.Tensor, states: Tuple[tf.Tensor]) -> Tuple[tf.Tensor, tf.Tensor]:
-        state = states[0]
-        angle_change = action * np.pi / 2
-        mid_angle = state[:, 2, tf.newaxis] + angle_change / 2
-        new_state = state + tf.concat([tf.cos(mid_angle) * 0.25, tf.sin(mid_angle) * 0.25, angle_change], axis=1)
-        return new_state, new_state
 
 
 @tf.function
@@ -50,8 +34,18 @@ def simulate_plan(actions: tf.Tensor) -> tf.Tensor:
     """Convert sequences of actions into sequences of positions (for visualization purposes)"""
     assert len(actions.shape) == 3
     assert actions.shape[2] == 1, 'This simulation assumes single-dimensional action space'
-    rnn = RNN(SimulationRNNCell(), return_sequences=True)
-    positions = tf.concat([tf.zeros([actions.shape[0], 1, 2]), rnn(actions)[:, :, :2]], axis=1)
+
+    def step_fn(state: tf.Tensor, action: tf.Tensor) -> tf.Tensor:
+        angle_change = action * np.pi / 2
+        mid_angle = state[:, 2, tf.newaxis] + angle_change / 2
+        new_state = state + tf.concat([tf.cos(mid_angle) * 0.25, tf.sin(mid_angle) * 0.25, angle_change], axis=1)
+        return new_state
+
+    positions: tf.Tensor = scan(fn=step_fn,
+                                elems=actions,
+                                initializer=tf.zeros([actions.shape[0], 3]),
+                                axis=1)
+    positions = tf.concat([tf.zeros([actions.shape[0], 1, 2]), positions[:, :, :2]], axis=1)
     return positions
 
 
