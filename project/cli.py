@@ -4,7 +4,7 @@
 
 import os
 import textwrap
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, Optional, Sequence, Tuple
 
 import click
 import wandb
@@ -14,7 +14,7 @@ from project.util.config import get_config_dir
 
 
 def with_global_options(func: Callable[..., None]) -> Callable[..., None]:
-    @click.option('-c', '--config', type=click.Path(dir_okay=False), default=None, help='Gin config')
+    @click.option('-c', '--config', type=click.Path(dir_okay=False), default=None, multiple=True, help='Gin config')
     @click.option('-l', '--logdir', type=click.Path(file_okay=False), default=None,
                   help='Base log dir, actual log dir will be a timestamped subdirectory')
     @click.option('--data', type=click.Path(file_okay=False), default=None,
@@ -27,7 +27,7 @@ def with_global_options(func: Callable[..., None]) -> Callable[..., None]:
     @click.option('--wandb-run', help='W&B run to evaluate or continue training from. Can be full id or part of name '
                                       '(the latest matching run will be used)')
     @click.argument('extra_options', nargs=-1)
-    def wrapper(config: Optional[str],
+    def wrapper(config: Tuple[str, ...],
                 logdir: Optional[str],
                 data: Optional[str],
                 verbose: bool,
@@ -46,16 +46,19 @@ def with_global_options(func: Callable[..., None]) -> Callable[..., None]:
             extra_options += (f'main.base_logdir="{logdir}"',)
         if debug:
             os.environ[wandb.env.MODE] = 'dryrun'
-        if config is None:
-            config = f'{get_config_dir()}/{"debug" if debug else "default"}.gin'
-            if verbose:
-                print(f'Using config {config}.')  # use print because logging has not yet been initialized
+        configs = ['default']
+        if debug:
+            configs.append('debug')
+        configs += config
+        configs = [name if name.endswith('.gin') else f'{get_config_dir()}/{name}.gin' for name in configs]
+        if verbose:
+            print(f'Using configs {configs}.')  # use print because logging has not yet been initialized
         if gpus is None and 'CUDA_VISIBLE_DEVICES' not in os.environ:
             print('Warning: No GPU devices specified. Defaulting to device 0.')
             os.environ['CUDA_VISIBLE_DEVICES'] = '0'
         if gpus is not None:
             os.environ['CUDA_VISIBLE_DEVICES'] = gpus
-        return func(config, data, verbosity, debug, model, extra_options, **kwargs)
+        return func(configs, data, verbosity, debug, model, extra_options, **kwargs)
     wrapper.__doc__ = textwrap.dedent(func.__doc__ or '') + "\n\nEXTRA_OPTIONS is one or more additional " \
                                                             "gin-config options, e.g. 'training.num_epochs=200'"
     wrapper.__click_params__ += getattr(func, '__click_params__', [])  # type: ignore[attr-defined]
@@ -72,7 +75,7 @@ def cli(ctx: click.Context) -> None:
 @cli.command(name='train')
 @with_global_options
 @click.option('--initial-data', help='Dataset to use instead of initial collection')
-def train_command(config: str,
+def train_command(configs: Sequence[str],
                   data: Optional[str],
                   verbosity: str,
                   debug: bool,
@@ -82,7 +85,7 @@ def train_command(config: str,
                   initial_data: Optional[str],
                   ) -> None:
     """Run training."""
-    with main_configure(config,
+    with main_configure(configs,
                         extra_options,
                         verbosity,
                         debug,
@@ -101,7 +104,7 @@ def train_command(config: str,
 @click.option('--no-sync', is_flag=True, help="Don't upload results to W&B")
 @click.option('-b', '--baseline', type=click.Choice(['random', 'straight']), help='Evaluate a trivial baseline agent '
                                                                                   'instead of a trained model')
-def evaluate_command(config: str,
+def evaluate_command(configs: Sequence[str],
                      data: Optional[str],
                      verbosity: str,
                      debug: bool,
@@ -118,7 +121,7 @@ def evaluate_command(config: str,
     """Evaluate checkpoint."""
     if not wandb_run:
         os.environ[wandb.env.MODE] = 'dryrun'
-    with main_configure(config,
+    with main_configure(configs,
                         extra_options,
                         verbosity,
                         debug,

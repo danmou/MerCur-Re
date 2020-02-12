@@ -1,0 +1,4 @@
+Habitat.train_dataset = 'gibson'
+Habitat.eval_dataset = 'gibson'
+Habitat.train_split = 'train'
+Habitat.eval_split = 'val_mini'

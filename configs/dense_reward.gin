@@ -1,0 +1,1 @@
+combine_rewards.rewards = [@dense_reward(), @collision_penalty(), @obstacle_distance_penalty()]

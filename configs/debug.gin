@@ -1,4 +1,4 @@
-include 'configs/default.gin'
+include 'configs/single_goal.gin'
 
 main.base_logdir = 'debug_logs'
 # Model.disable_tf_optimization = True
@@ -40,10 +40,7 @@ HierarchicalCrossEntropyMethod.top_k = 3
 
 tf.gpus.gpu_ids = [0]
 
-curriculum.enabled = False
 CollectGymDataset.rejection_metric = None
 habitat_train_task.max_length = 10
 habitat_eval_task.max_length = 10
-Habitat.train_dataset = 'habitat_test_single'
-Habitat.eval_dataset = 'habitat_test_single'
 Habitat.gpu_id = 0

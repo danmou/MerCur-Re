@@ -1,0 +1,3 @@
+include 'configs/planet.gin'
+MPCAgent.planner = @HierarchicalCrossEntropyMethod
+Model.rnn_class = @rnns.HierarchicalRNN

@@ -1,0 +1,3 @@
+curriculum.enabled = False
+Habitat.train_dataset = 'habitat_test_single'
+Habitat.eval_dataset = 'habitat_test_single'

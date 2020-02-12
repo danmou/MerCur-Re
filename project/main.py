@@ -7,7 +7,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Generator, Optional, Tuple, Union
+from typing import Generator, Optional, Sequence, Tuple, Union
 
 import gin
 import gin.tf.external_configurables
@@ -126,7 +126,7 @@ class Main:
 
 
 @contextlib.contextmanager
-def main_configure(config: str,
+def main_configure(configs: Sequence[str],
                    extra_options: Tuple[str, ...],
                    verbosity: str,
                    debug: bool = False,
@@ -143,11 +143,13 @@ def main_configure(config: str,
     else:
         resume_args = {}
     wandb.init(sync_tensorboard=False, job_type=job_type, **resume_args)
-    gin.parse_config_files_and_bindings([config], extra_options)
+    gin.parse_config_files_and_bindings(configs, extra_options)
     with gin.unlock_config():
         gin.bind_parameter('main.base_logdir', str(Path(gin.query_parameter('main.base_logdir')).absolute()))
     with open(Path(wandb.run.dir) / f'config_{job_type}.gin', 'w') as f:
-        f.write(open(config).read())
+        for config in configs:
+            f.write(f'\n# {config}\n')
+            f.write(open(config).read())
         f.write('\n# Extra options\n')
         f.write('\n'.join(extra_options))
     checkpoint_path = None if checkpoint is None else Path(checkpoint).absolute()

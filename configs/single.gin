@@ -1,4 +1,0 @@
-include 'configs/default.gin'
-
-curriculum.enabled = False
-Habitat.dataset = 'habitat_test_single'
