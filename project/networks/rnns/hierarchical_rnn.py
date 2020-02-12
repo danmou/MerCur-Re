@@ -39,7 +39,8 @@ class HierarchicalRNN(RNN):
                                   divergence_loss_scale=divergence_loss_scales[0],
                                   divergence_loss_free_nats=divergence_loss_free_nats,
                                   name=f'{name}_base')
-        self.predictors = list(open_loop_predictor_class(name=f'{name}_predictor_{s}') for s in time_scales[1:])
+        self.predictors = [self.base_rnn.predictor.open_loop_predictor]
+        self.predictors.extend(open_loop_predictor_class(name=f'{name}_predictor_{s}') for s in time_scales[1:])
         self.action_vaes: List[DenseVAE] = []
         for scale_i, scale_j, embed_size_i, embed_size_j in zip(time_scales,
                                                                 time_scales[1:],
@@ -112,7 +113,7 @@ class HierarchicalRNN(RNN):
                                                                     masks,
                                                                     self.time_scales[1:],
                                                                     self.divergence_loss_scales[1:],
-                                                                    self.predictors):
+                                                                    self.predictors[1:]):
             # TODO: Investigate whether using the prior or posterior as target works better
             # Note: prior is only open-loop for the last step; if this works best we should see if it's even better to
             # use `time_scale`-step open-loop predictions

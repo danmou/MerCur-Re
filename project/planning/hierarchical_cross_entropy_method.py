@@ -4,63 +4,67 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, List, Optional, Tuple, Union
+from typing import Optional, Sequence, Tuple, Union
 
 import gin
 import gym.spaces
 import numpy as np
 import tensorflow as tf
 
+from project.model import Model
 from project.networks import DenseVAE
 from project.networks.predictors import OpenLoopPredictor
-from project.networks.rnns import RNN
 
-from .base import Planner
+from .base import DecoderFunction, Planner
 from .cross_entropy_method import CrossEntropyMethod
 
 
 @gin.configurable(whitelist=['horizon', 'amount', 'top_k', 'iterations'])
 class HierarchicalCrossEntropyMethod(Planner):
     def __init__(self,
-                 predictor: OpenLoopPredictor,
-                 objective_fn: Callable[[Tuple[tf.Tensor, ...]], tf.Tensor],
-                 action_space: gym.spaces.box,
+                 predictors: Sequence[OpenLoopPredictor],
+                 action_vaes: Sequence[Optional[DenseVAE]],
+                 objective_decoder: DecoderFunction,
+                 action_spaces: Sequence[gym.spaces.box],
                  horizon: int = 12,
                  amount: int = 1000,
                  top_k: int = 100,
                  iterations: int = 10,
                  ) -> None:
-        super().__init__(predictor, objective_fn, action_space)
+        super().__init__(predictors[0], objective_decoder, action_spaces[0])
         self.horizon = horizon
         self.amount = amount
         self.top_k = top_k
         self.iterations = iterations
-        self._planners: List[CrossEntropyMethod] = []
-        self._action_vaes: List[Optional[DenseVAE]] = []
-
-    @classmethod
-    def from_rnn(cls, rnn: RNN, *args: Any, **kwargs: Any) -> HierarchicalCrossEntropyMethod:
-        self = cls(rnn.predictor.open_loop_predictor, *args, **kwargs)
-        self._planners = [CrossEntropyMethod(self._predictor,
-                                             self._objective_fn,
-                                             self.action_space,
+        self._planners = [CrossEntropyMethod(predictor,
+                                             self._objective_decoder,
+                                             action_space,
                                              self.horizon,
                                              self.amount,
                                              self.top_k,
-                                             self.iterations)]
-        self._planners += [CrossEntropyMethod(predictor,
-                                              self._objective_fn,
-                                              gym.spaces.Box(-2.0, 2.0, shape=(action_embedding,), dtype=np.float32),
-                                              self.horizon,
-                                              self.amount,
-                                              self.top_k,
-                                              self.iterations)
-                           for predictor, action_embedding in zip(rnn.predictors, rnn.action_embedding_sizes[1:])]
-        self._action_vaes = [None] + rnn.action_vaes
-        return self
+                                             self.iterations)
+                          for predictor, action_space in zip(predictors, action_spaces)]
+        self._action_vaes = action_vaes
 
-    @tf.function(experimental_autograph_options=tf.autograph.experimental.Feature.ASSERT_STATEMENTS)
-    def __call__(self,
+    @classmethod
+    def from_model(cls, model: Model, action_space: gym.spaces.box) -> Planner:
+        action_spaces = [action_space] + [gym.spaces.Box(-2.0, 2.0, shape=(size,), dtype=np.float32)
+                                          for size in model.rnn.action_embedding_sizes[1:]]
+        return cls(predictors=model.rnn.predictors,
+                   action_vaes=[None] + model.rnn.action_vaes,
+                   action_spaces=action_spaces,
+                   objective_decoder=model.decoders['reward'])
+
+    @tf.function
+    def get_action(self,
+                   initial_state: Tuple[Union[tf.Tensor, tf.Variable], ...],
+                   visualization_goal: Optional[tf.Tensor] = None,
+                   ) -> tf.Tensor:
+        mean, std_dev = self.get_plan(initial_state, visualization_goal=visualization_goal)
+        return mean[0, :]
+
+    @tf.function
+    def get_plan(self,
                  initial_state: Tuple[Union[tf.Tensor, tf.Variable], ...],
                  initial_mean: Optional[tf.Tensor] = None,
                  initial_std_dev: Optional[tf.Tensor] = None,
@@ -75,7 +79,7 @@ class HierarchicalCrossEntropyMethod(Planner):
             if std_dev is not None:
                 std_dev = std_dev[:planner.horizon]
             vis_goal = visualization_goal if vae is None else None
-            mean, std_dev = planner(initial_state, mean, std_dev, vis_goal)  # shape: [horizon, action_space]
+            mean, std_dev = planner.get_plan(initial_state, mean, std_dev, vis_goal)  # shape: [horizon, action_space]
             if vae is not None:
                 mean = vae.decoder(mean[tf.newaxis, :], training=False)  # shape: [1, horizon, factor, new_action_space]
                 factor = mean.shape[2]

@@ -1,17 +1,8 @@
-# Copyright 2019 The PlaNet Authors. All rights reserved.
-# Modifications copyright 2019 Daniel Mouritzen.
+# cross_entropy_method.py: CEM planner as used in PlaNet
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# (C) 2019, Daniel Mouritzen
+
+from __future__ import annotations
 
 from typing import Callable, Optional, Tuple, Union
 
@@ -23,10 +14,11 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.layers import RNN
 
+from project.model import Model
 from project.networks.predictors import OpenLoopPredictor
 from project.util.tf import scan
 
-from .base import Planner
+from .base import DecoderFunction, Planner
 
 
 @tf.function
@@ -132,22 +124,36 @@ def cross_entropy_method(initial_state: Tuple[Union[tf.Tensor, tf.Variable], ...
 class CrossEntropyMethod(Planner):
     def __init__(self,
                  predictor: OpenLoopPredictor,
-                 objective_fn: Callable[[Tuple[tf.Tensor, ...]], tf.Tensor],
+                 objective_decoder: DecoderFunction,
                  action_space: gym.spaces.box,
                  horizon: int = 12,
                  amount: int = 1000,
                  top_k: int = 100,
                  iterations: int = 10,
                  ) -> None:
-        super().__init__(predictor, objective_fn, action_space)
+        super().__init__(predictor, objective_decoder, action_space)
         self.horizon = horizon
         self.amount = amount
         self.top_k = top_k
         self.iterations = iterations
         self._rnn = RNN(predictor, return_sequences=True, name='planner_rnn')
 
+    @classmethod
+    def from_model(cls, model: Model, action_space: gym.spaces.box) -> CrossEntropyMethod:
+        return cls(predictor=model.rnn.predictor.open_loop_predictor,
+                   objective_decoder=model.decoders['reward'],
+                   action_space=action_space)
+
     @tf.function
-    def __call__(self,
+    def get_action(self,
+                   initial_state: Tuple[Union[tf.Tensor, tf.Variable], ...],
+                   visualization_goal: Optional[tf.Tensor] = None,
+                   ) -> tf.Tensor:
+        mean, std_dev = self.get_plan(initial_state, visualization_goal=visualization_goal)
+        return mean[0, :]
+
+    @tf.function
+    def get_plan(self,
                  initial_state: Tuple[Union[tf.Tensor, tf.Variable], ...],
                  initial_mean: Optional[tf.Tensor] = None,
                  initial_std_dev: Optional[tf.Tensor] = None,

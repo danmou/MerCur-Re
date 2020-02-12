@@ -2,7 +2,7 @@
 #
 # (C) 2019, Daniel Mouritzen
 
-from typing import Optional, Tuple, Type, Union
+from typing import Optional, Type, Union
 
 import gin
 import gym.spaces
@@ -31,14 +31,10 @@ class MPCAgent(ModelBasedAgent):
         assert isinstance(action_space, gym.spaces.Box), f'Unsupported action space {action_space}'
         super().__init__(action_space, model)
         self._objective_decoder = model.decoders[objective]
-        self._planner = planner.from_rnn(model.rnn, self._objective_fn, self.action_space)
+        self._planner = planner.from_model(model, self.action_space)
         self._exploration_noise = exploration_noise
         self._goal = tf.Variable([0.0, 0.0])
         self._visualize = tf.Variable(visualize)
-
-    def _objective_fn(self, state: Tuple[tf.Tensor, ...]) -> tf.Tensor:
-        obj = self._objective_decoder(self._predictor.state_to_features(state), training=False)
-        return tf.reduce_sum(obj, axis=1)
 
     @property
     def visualize(self) -> tf.Variable:
@@ -57,11 +53,10 @@ class MPCAgent(ModelBasedAgent):
     @tf.function
     def act(self) -> tf.Tensor:
         if self.visualize:
-            plan, _ = self._planner(self.state, visualization_goal=self._goal)
+            action = self._planner.get_action(self.state, visualization_goal=self._goal)
         else:
-            plan, _ = self._planner(self.state)
+            action = self._planner.get_action(self.state)
         self.visualize = False  # type: ignore[misc]  # mypy/issues/1362
-        action = plan[0, :]
         if self._exploration_noise:
             action += tf.random.normal(action.shape, stddev=self._exploration_noise)
         return action
