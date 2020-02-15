@@ -110,10 +110,13 @@ def move_dim(tensors: Nested[tf.Tensor], current: int, new: int) -> Nested[tf.Te
     return tf.nest.map_structure(lambda x: fn(x, current, new), tensors)
 
 
-def combine_dims(tensors: Nested[tf.Tensor], start: int, end: int) -> Nested[tf.Tensor]:
-    """Combine (flatten) dimensions from `start` to `end` (not including end)"""
-    if start >= end - 1:
+def combine_dims(tensors: Nested[tf.Tensor], dims: Sequence[int]) -> Nested[tf.Tensor]:
+    """Combine (flatten) consecutive dimensions"""
+    if len(dims) == 0:
         return tensors
+    start = dims[0]
+    end = dims[-1] + 1
+    assert list(dims) == list(range(start, end)), 'Dimensions to combine must be consecutive'
 
     def fn(tensor: tf.Tensor) -> tf.Tensor:
         if tensor.shape.ndims < end - start:

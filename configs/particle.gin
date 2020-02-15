@@ -1,0 +1,3 @@
+training.agent_cls = @MPCAgent
+get_evaluation_agent.agent_cls = None  # If None, the training agent is reused
+MPCAgent.planner = @ParticlePlanner

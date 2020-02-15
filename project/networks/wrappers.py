@@ -28,7 +28,7 @@ class ExtraBatchDim(auto_shape.Wrapper):
         batch_shape = input_flattened[0].shape[:2]
         assert all(i.shape[:2].as_list() == batch_shape.as_list() for i in input_flattened), (
             f'Mismatched batch dimensions in input: {input_flattened}')
-        input_combined = tf.nest.map_structure(lambda t: combine_dims(t, 0, 2), input)
+        input_combined = tf.nest.map_structure(lambda t: combine_dims(t, [0, 1]), input)
         output_combined = self.layer(input_combined, **kwargs)
         return tf.nest.map_structure(lambda t: split_dim(t, 0, batch_shape), output_combined)
 

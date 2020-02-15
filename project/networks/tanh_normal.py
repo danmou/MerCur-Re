@@ -46,8 +46,8 @@ class TanhNormalDistribution(tfd.Distribution):
     def _event_shape(self) -> tf.TensorShape:
         return self._dist.event_shape
 
-    def sample(self, **kwargs: Any) -> tf.Tensor:
-        return self._dist.sample(**kwargs)
+    def sample(self, *args: Any, **kwargs: Any) -> tf.Tensor:
+        return self._dist.sample(*args, **kwargs)
 
     def _mean(self) -> tf.Tensor:
         samples = self._dist.sample(self._num_samples)
@@ -63,6 +63,9 @@ class TanhNormalDistribution(tfd.Distribution):
         log_probs = self._dist.log_prob(samples)
         mask = tf.one_hot(tf.argmax(log_probs, axis=0), self._num_samples, axis=0)
         return tf.reduce_sum(samples * mask[..., None], 0)
+
+    def _log_prob(self, value: tf.Tensor) -> tf.Tensor:
+        return self._dist.log_prob(value)
 
     def _entropy(self) -> tf.Tensor:
         sample = self._dist.sample(self._num_samples)

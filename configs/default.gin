@@ -97,6 +97,10 @@ HierarchicalCrossEntropyMethod.horizon = 10
 HierarchicalCrossEntropyMethod.iterations = 4
 HierarchicalCrossEntropyMethod.amount = 1000  # number of action sequence samples per iteration
 HierarchicalCrossEntropyMethod.top_k = 100  # number of best samples to use as basis for next iteration
+# ParticlePlanner complexity is proportional to state_samples**2 * action_samples * horizon
+ParticlePlanner.state_samples = 10  # How many times to sample the initial state
+ParticlePlanner.action_samples = 100  # How many times to sample the initial action
+ParticlePlanner.horizon = 1
 
 # TF options
 # tf.options.log_device_placement = False

@@ -209,7 +209,7 @@ class Model(auto_shape.Model):
     @gin.configurable(whitelist=['horizon'])
     def imagine_forward(self, initial_states: Tuple[tf.Tensor, ...], horizon: int = 15, **kwargs: Any) -> Tuple[tf.Tensor, ...]:
         initial_states = tf.nest.map_structure(lambda x: tf.stop_gradient(x[:, :-1]), initial_states)
-        initial_states = combine_dims(initial_states, start=0, end=2)  # type: ignore[assignment]
+        initial_states = combine_dims(initial_states, [0, 1])  # type: ignore[assignment]
 
         def step_fn(prev: Tuple[tf.Tensor, ...], index: tf.Tensor) -> Tuple[tf.Tensor, ...]:
             features = tf.stop_gradient(self.rnn.state_to_features(prev))

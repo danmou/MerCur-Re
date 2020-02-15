@@ -37,6 +37,9 @@ HierarchicalCrossEntropyMethod.horizon = 4
 HierarchicalCrossEntropyMethod.iterations = 2
 HierarchicalCrossEntropyMethod.amount = 5
 HierarchicalCrossEntropyMethod.top_k = 3
+ParticlePlanner.state_samples = 2
+ParticlePlanner.action_samples = 5
+ParticlePlanner.horizon = 3
 
 tf.gpus.gpu_ids = [0]
 

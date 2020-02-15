@@ -68,7 +68,7 @@ def lambda_return(rewards: tf.Tensor,
     """
     if isinstance(discount, (int, float)) or discount.shape.num_elements() == 1:
         discount = discount * tf.ones_like(rewards)
-    assert rewards.shape == values.shape == discount.shape, (rewards.shape, values.shape, discount.shape)
+    assert rewards.shape == values.shape == discount.shape, 'Incompatible shapes!'
     rewards, values, discount = move_dim((rewards, values, discount), axis, 0)
     if final_value is None:
         final_value = tf.zeros_like(values[-1])
