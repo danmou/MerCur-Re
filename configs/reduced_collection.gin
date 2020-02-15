@@ -1,0 +1,2 @@
+DataCollectionCallback.period = 10  # epochs per data collection
+DataCollectionCallback.train_episodes = 10
