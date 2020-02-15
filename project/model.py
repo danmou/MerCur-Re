@@ -229,9 +229,9 @@ class Model(auto_shape.Model):
                               lambda_: float = 1.0,
                               ) -> tf.Tensor:
         rewards = rewards[:, :-1]
+        final_value = values[:, -1]
         values = values[:, :-1]
         discounts = 1 - done_probs[:, :-1]
-        final_value = values[:, -1]
         return_ = lambda_return(rewards, values, discounts, lambda_, final_value, axis=1, stop_gradient=False)
 
         # TODO: Check if this helps
@@ -246,9 +246,9 @@ class Model(auto_shape.Model):
                            lambda_: float = 1.0,
                            ) -> tf.Tensor:
         rewards = rewards[:, :-1]
+        final_value = values[:, -1]
         values = values[:, :-1]
         discounts = tf.stop_gradient(1 - done_probs[:, :-1])
-        final_value = values[:, -1]
         return_ = lambda_return(rewards, values, discounts, lambda_, final_value, axis=1, stop_gradient=True)
         loss = mse(values, return_, reduce=False)
 
