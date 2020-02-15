@@ -131,6 +131,7 @@ Habitat.eval_split = 'val_mini'
 Habitat.gpu_id = 0
 Habitat.image_key = 'rgb'
 Habitat.goal_key = 'pointgoal_with_gps_compass'
+Habitat.eval_episodes_per_scene = 3
 
 # Reward
 dense_reward.slack_reward = -0.01

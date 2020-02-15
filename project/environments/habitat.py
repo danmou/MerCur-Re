@@ -358,7 +358,7 @@ class VectorHabitat(VectorEnv):
 
 
 @gin.configurable('Habitat', whitelist=['task', 'train_dataset', 'train_split', 'eval_dataset', 'eval_split', 'gpu_id',
-                                        'image_key', 'goal_key', 'reward_function'])
+                                        'image_key', 'goal_key', 'reward_function', 'eval_episodes_per_scene'])
 def get_config(training: bool = False,
                top_down_map: bool = False,
                max_steps: Optional[Union[int, float]] = None,
@@ -371,6 +371,7 @@ def get_config(training: bool = False,
                image_key: str = 'rgb',
                goal_key: str = 'pointgoal_with_gps_compass',
                reward_function: RewardFunction = gin.REQUIRED,
+               eval_episodes_per_scene: int = 3
                ) -> Dict[str, Any]:
     mode = 'train' if training else 'eval'
     dataset = train_dataset if training else eval_dataset
@@ -381,7 +382,7 @@ def get_config(training: bool = False,
     opts += ['DATASET.SPLIT', split]
     if not training:
         opts += ['ENVIRONMENT.ITERATOR_OPTIONS.SHUFFLE', False]
-        opts += ['ENVIRONMENT.ITERATOR_OPTIONS.MAX_SCENE_REPEAT_EPISODES', 3]
+        opts += ['ENVIRONMENT.ITERATOR_OPTIONS.MAX_SCENE_REPEAT_EPISODES', eval_episodes_per_scene]
     if not task.endswith('.yaml'):
         task = f'{get_config_dir()}/habitat/tasks/{task}.yaml'
     if not dataset.endswith('.yaml'):
