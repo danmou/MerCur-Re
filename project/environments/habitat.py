@@ -176,8 +176,8 @@ class Habitat(habitat.RLEnv):
         )
         return distance
 
-    def get_info(self, observations: Observations) -> Dict[Any, Any]:
-        metrics = self.habitat_env.get_metrics()
+    def get_info(self, observations: Observations) -> Dict[str, Any]:
+        metrics = cast(Dict[str, Any], self.habitat_env.get_metrics())
         if 'distance_to_goal' in metrics:
             dist_dict = metrics.pop('distance_to_goal')
             metrics['path_length'] = dist_dict['agent_path_length']
@@ -214,19 +214,7 @@ class Habitat(habitat.RLEnv):
         if done:
             logger.debug(f'Episode finished at step {self._step_count}.')
         if self._capture_video:
-            # upscale image to make the resulting video more viewable
-            new_obs = {'rgb': np.repeat(np.repeat(obs['image'], 4, axis=0), 4, axis=1)}
-            act = action * 0.9
-            if act:
-                img_size = new_obs['rgb'].shape[0]
-                start = img_size / 2
-                end = img_size * (1 - act) / 2
-                left = round(min(start, end))
-                right = round(max(start, end))
-                new_obs['rgb'][round(img_size * 0.9):round(img_size * 0.95),
-                               round(left):round(right)] = np.array([0, 0, 255])
-
-            self._rgb_frames.append(observations_to_image(new_obs, self.habitat_env.get_metrics()))
+            self._store_video_frame(obs, info['taken_action'], self.habitat_env.get_metrics())
         return obs, reward, done, info
 
     def reset(self) -> Observations:
@@ -236,7 +224,37 @@ class Habitat(habitat.RLEnv):
         self._rgb_frames = []
         with capture_output('habitat_sim'):
             obs = super().reset()
-        return self._update_keys(obs)
+        obs = self._update_keys(obs)
+        if self._capture_video:
+            self._store_video_frame(obs)
+        return obs
+
+    def _store_video_frame(self,
+                           obs: Observations,
+                           action: Optional[Union[np.ndarray, float]] = None,
+                           info: Optional[Dict[str, Any]] = None,
+                           ) -> None:
+        new_obs = obs.copy()
+
+        for key in ['image', 'depth']:
+            if key not in new_obs:
+                continue
+            if new_obs[key].shape[0] < 200:
+                # upscale image to make the resulting video more viewable
+                new_obs[key] = np.repeat(np.repeat(new_obs[key], 4, axis=0), 4, axis=1)
+        if action:
+            act = action * 0.9
+            img_size = new_obs['image'].shape[0]
+            start = img_size / 2
+            end = img_size * (1 - act) / 2
+            left = round(min(start, end))
+            right = round(max(start, end))
+            new_obs['image'][
+                round(img_size * 0.9):round(img_size * 0.95), round(left):round(right)
+            ] = np.array([0, 0, 255])
+
+        new_obs['rgb'] = new_obs.pop('image')
+        self._rgb_frames.append(observations_to_image(new_obs, info or {}))
 
     _ObsOrDict = TypeVar('_ObsOrDict', Observations, Dict['str', Any])
 
@@ -259,6 +277,13 @@ class Habitat(habitat.RLEnv):
         assert self._capture_video, 'Not capturing video; nothing to save.'
         if len(self._rgb_frames) == 0:
             return
+        first_shape = self._rgb_frames[0].shape
+        next_shape = self._rgb_frames[1].shape
+        if first_shape != next_shape:
+            assert first_shape[0] == next_shape[0]
+            # First frame is missing the top-down map, so we copy it from the next one
+            td_map = self._rgb_frames[1][:, first_shape[1]:, :]
+            self._rgb_frames[0] = np.concatenate((self._rgb_frames[0], td_map), 1)
         file = Path(file)
         with capture_output('save_video'):
             images_to_video(self._rgb_frames, str(file.parent), file.name, fps=fps, quality=5)
