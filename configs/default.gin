@@ -121,6 +121,7 @@ habitat_train_task.max_length = 100  # Maximum sequence length
 habitat_train_task.wrappers = [@curriculum(), @action_repeat()]
 habitat_eval_task.max_length = 150   # Maximum sequence length
 habitat_eval_task.wrappers = [@action_repeat()]
+habitat_task.depth = False
 curriculum.enabled = False
 curriculum.start_threshold = 1.5  # Initial threshold in meters.
 curriculum.initial_delay = 500  # Number of episodes to wait before increasing threshold.
@@ -134,6 +135,7 @@ Habitat.eval_split = 'val_mini'
 Habitat.gpu_id = 0
 Habitat.image_key = 'rgb'
 Habitat.goal_key = 'pointgoal_with_gps_compass'
+Habitat.depth_key = None
 Habitat.eval_episodes_per_scene = 3
 
 # Reward

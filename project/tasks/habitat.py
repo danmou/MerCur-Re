@@ -36,14 +36,17 @@ def habitat_eval_task(max_length: int = 150,
     return cast(Task, habitat_task(training=False, max_length=max_length, wrappers=wrappers))
 
 
-@gin.configurable(whitelist=['action_repeat'])
+@gin.configurable(whitelist=['action_repeat', 'depth'])
 def habitat_task(training: bool,
                  max_length: int,
                  wrappers: List[Tuple[Type[Wrapper], Callable[[Dict[str, Any]], Dict[str, Any]]]],
                  action_repeat: int = 1,
+                 depth: bool = False
                  ) -> Task:
     state_components = ['reward']
     observation_components = ['image', 'goal']
+    if depth:
+        observation_components.append('depth')
     metrics = ['success', 'spl', 'path_length', 'optimal_path_length', 'remaining_distance', 'collisions']
 
     def env_ctor(**kwargs: Any) -> habitat.VectorHabitat:

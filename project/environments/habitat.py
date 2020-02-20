@@ -95,6 +95,7 @@ class Habitat(habitat.RLEnv):
                  config: habitat.Config,
                  image_key: str,
                  goal_key: str,
+                 depth_key: Optional[str],
                  reward_function: RewardFunction,
                  capture_video: bool = False,
                  seed: Optional[int] = None,
@@ -103,6 +104,7 @@ class Habitat(habitat.RLEnv):
                  **_: Any) -> None:
         self._image_key = image_key
         self._goal_key = goal_key
+        self._depth_key = depth_key
         self._reward_function = reward_function
         self._reward_function.set_env(self)
         self._called_stop: bool = False
@@ -241,6 +243,8 @@ class Habitat(habitat.RLEnv):
     def _update_keys(self, obs: _ObsOrDict) -> _ObsOrDict:
         obs_dict = {'image': obs[self._image_key],
                     'goal': obs[self._goal_key]}
+        if self._depth_key:
+            obs_dict['depth'] = obs[self._depth_key]
         # Convert back to original type (Observations.__init__ tries to process the input dict)
         obs = type(obs)({})
         obs.update(obs_dict)
@@ -358,7 +362,7 @@ class VectorHabitat(VectorEnv):
 
 
 @gin.configurable('Habitat', whitelist=['task', 'train_dataset', 'train_split', 'eval_dataset', 'eval_split', 'gpu_id',
-                                        'image_key', 'goal_key', 'reward_function', 'eval_episodes_per_scene'])
+                                        'image_key', 'goal_key', 'depth_key', 'reward_function', 'eval_episodes_per_scene'])
 def get_config(training: bool = False,
                top_down_map: bool = False,
                max_steps: Optional[Union[int, float]] = None,
@@ -370,6 +374,7 @@ def get_config(training: bool = False,
                gpu_id: int = 0,
                image_key: str = 'rgb',
                goal_key: str = 'pointgoal_with_gps_compass',
+               depth_key: Optional[str] = None,
                reward_function: RewardFunction = gin.REQUIRED,
                eval_episodes_per_scene: int = 3
                ) -> Dict[str, Any]:
@@ -408,4 +413,8 @@ def get_config(training: bool = False,
         # Top-down map is expensive to compute, so we only enable it when needed.
         config.TASK.MEASUREMENTS.append('TOP_DOWN_MAP')
     config.freeze()
-    return {'config': config, 'image_key': image_key, 'goal_key': goal_key, 'reward_function': reward_function}
+    return {'config': config,
+            'image_key': image_key,
+            'goal_key': goal_key,
+            'depth_key': depth_key,
+            'reward_function': reward_function}
