@@ -6,5 +6,7 @@ from .base import Agent, BlindAgent, ModelBasedAgent
 from .mpc_agent import MPCAgent
 from .policy_network_agent import PolicyNetworkAgent
 from .simple import ConstantAgent, RandomAgent
+from .slam_agent import SLAMAgent
 
-__all__ = ['Agent', 'BlindAgent', 'ModelBasedAgent', 'MPCAgent', 'PolicyNetworkAgent', 'ConstantAgent', 'RandomAgent']
+__all__ = ['Agent', 'BlindAgent', 'ModelBasedAgent', 'MPCAgent', 'PolicyNetworkAgent', 'ConstantAgent', 'RandomAgent',
+           'SLAMAgent']

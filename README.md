@@ -29,9 +29,28 @@ pip install -r requirements.txt
 python setup.py install --headless --with-cuda
 ```
 
+#### Installing SLAM baseline dependencies
+Create a new conda env with all the deps in environment.yml installed (SLAM deps are commented out).
+Run the script `./project/habitat_baselines/slambased/install_deps.sh`.
+
 ### Running
+See
 ```bash
 ./run.py --help
+```
+E.g.
+```bash
+./run.py train --gpus=0 -c gibson_short -c dense_reward -c dreamer
+```
+
+#### PPO baseline
+```bash
+./run.py habitat-baseline --gpus=0 -dc default --run-type train --exp-config ppo_pointnav --num-processes=32 -c sparse_reward -c gibson -m logs/.../checkpoints/ckpt.123.pth
+```
+
+#### SLAM baseline
+```bash
+./run.py evaluate --gpus=0 -n 10 -b slam
 ```
 
 ### Setup MuJoCo and DeepMind Control Suite

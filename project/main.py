@@ -17,7 +17,7 @@ import wandb.settings
 from loguru import logger
 from tensorflow.python.util import deprecation
 
-from project.execution import Evaluator, train
+from project.execution import Evaluator, run_baseline, train
 from project.util.logging import init_logging
 
 
@@ -123,6 +123,18 @@ class Main:
                                                                 visualize_planner=visualize_planner,
                                                                 seed=seed,
                                                                 sync_wandb=wandb.run.resumed and not no_sync)
+
+    def run_baseline(self, run_type: str, exp_config: str, num_processes: Optional[int]) -> None:
+        try:
+            with self._catch():
+                config_path = Path(exp_config)
+                if not config_path.exists() and not exp_config.endswith('.yaml'):
+                    config_path = Path(f'configs/baselines/{exp_config}.yaml')
+                run_baseline(self.logdir, run_type, config_path, checkpoint=self.checkpoint, num_processes=num_processes)
+        finally:
+            # Make sure all checkpoints get uploaded
+            wandb.save(f'{self.logdir}/checkpoints/*', policy='end')
+            wandb.log(commit=True)
 
 
 @contextlib.contextmanager

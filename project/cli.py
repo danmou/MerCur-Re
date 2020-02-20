@@ -102,8 +102,8 @@ def train_command(configs: Sequence[str],
 @click.option('--visualize-planner', is_flag=True, help='Generate plots to visualize CEM planning process')
 @click.option('--seed', type=int, help='Set seed for random values (this will also disable parallelization of loops)')
 @click.option('--no-sync', is_flag=True, help="Don't upload results to W&B")
-@click.option('-b', '--baseline', type=click.Choice(['random', 'straight']), help='Evaluate a trivial baseline agent '
-                                                                                  'instead of a trained model')
+@click.option('-b', '--baseline', type=click.Choice(['random', 'straight', 'slam']),
+              help='Evaluate a baseline agent instead of a trained model')
 def evaluate_command(configs: Sequence[str],
                      data: Optional[str],
                      verbosity: str,
@@ -121,6 +121,10 @@ def evaluate_command(configs: Sequence[str],
     """Evaluate checkpoint."""
     if not wandb_run:
         os.environ[wandb.env.MODE] = 'dryrun'
+    if baseline == 'slam':
+        extra_options = (f'Habitat.task="{get_config_dir()}/habitat/tasks/slam_pointnav.yaml"',
+                         'Habitat.depth_key="depth"',
+                         'habitat_task.depth=True') + extra_options
     with main_configure(configs,
                         extra_options,
                         verbosity,
@@ -130,3 +134,30 @@ def evaluate_command(configs: Sequence[str],
                         job_type='eval',
                         wandb_continue=wandb_run) as main:
         main.evaluate(num_episodes, not no_video, visualize_planner, seed, no_sync, baseline)
+
+
+@cli.command(name='habitat-baseline')
+@with_global_options
+@click.option('--run-type', type=click.Choice(['train', 'eval']), required=True)
+@click.option('--exp-config', type=str, required=True, help='Path to or name of experiment config')
+@click.option('--num-processes', type=int, help='Number of parallel processes')
+def habitat_baseline_command(configs: Sequence[str],
+                             data: Optional[str],
+                             verbosity: str,
+                             debug: bool,
+                             checkpoint: Optional[str],
+                             extra_options: Tuple[str, ...],
+                             wandb_run: Optional[str],
+                             run_type: str,
+                             exp_config: str,
+                             num_processes: Optional[int],
+                             ) -> None:
+    """Train or evaluate Habitat baseline."""
+    with main_configure(configs,
+                        extra_options,
+                        verbosity,
+                        debug,
+                        checkpoint,
+                        data=data,
+                        wandb_continue=wandb_run) as main:
+        main.run_baseline(run_type, exp_config, num_processes)

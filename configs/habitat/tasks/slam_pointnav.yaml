@@ -7,12 +7,17 @@ SIMULATOR:
   AGENT_0:
     HEIGHT: 1.5  # meters
     RADIUS: 0.1  # meters
-    SENSORS: ['RGB_SENSOR']
+    SENSORS: ['RGB_SENSOR', 'DEPTH_SENSOR']
   RGB_SENSOR:
-    WIDTH: 64
-    HEIGHT: 64
-    HFOV: &camera_fov 90  # degrees
-    POSITION: [0, 1.25, 0]  # [x, y, z] in meters
+    WIDTH: &image_width 256
+    HEIGHT: &image_height 256
+    HFOV: &camera_fov 90  # degrees  # Specific value required for SLAM implementation
+    POSITION: &camera_position [0, 1.25, 0]  # [x, y, z] in meters
+  DEPTH_SENSOR:
+    WIDTH: *image_width
+    HEIGHT: *image_height
+    HFOV: *camera_fov
+    POSITION: *camera_position
 
 TASK:
   TYPE: 'Nav-v0'
@@ -20,7 +25,7 @@ TASK:
 
   SENSORS: ['POINTGOAL_WITH_GPS_COMPASS_SENSOR']
   POINTGOAL_WITH_GPS_COMPASS_SENSOR:
-    GOAL_FORMAT: 'CARTESIAN'
+    GOAL_FORMAT: 'POLAR'  # Specific value required for SLAM implementation
     DIMENSIONALITY: 2
   GOAL_SENSOR_UUID: 'pointgoal_with_gps_compass'
 

@@ -1,0 +1,1 @@
+BASE_TASK_CONFIG_PATH: "configs/habitat/tasks/slam_pointnav.yaml"

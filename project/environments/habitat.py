@@ -24,7 +24,6 @@ from habitat.tasks.nav.nav import NavigationEpisode, SimulatorTaskAction
 from habitat.utils.visualizations.utils import images_to_video, observations_to_image
 from habitat_sim.agent.controls.controls import ActuationSpec
 from habitat_sim.agent.controls.default_controls import LookLeft
-from loguru import logger
 
 from project.util.config import get_config_dir
 from project.util.logging import capture_output
@@ -116,8 +115,7 @@ class Habitat(habitat.RLEnv):
             # This is needed for reproducible episode shuffling
             random.seed(seed)
             np.random.seed(seed)
-        with capture_output('habitat_sim'):
-            super().__init__(config)
+        super().__init__(config)
         if seed is not None:
             self.seed(seed)
         self.observation_space: gym.spaces.Dict = gym.spaces.Dict(self._update_keys(self._env.observation_space.spaces))
@@ -211,8 +209,6 @@ class Habitat(habitat.RLEnv):
             info['taken_action'] = action
             reward = sum_reward
         obs = self._update_keys(obs)
-        if done:
-            logger.debug(f'Episode finished at step {self._step_count}.')
         if self._capture_video:
             self._store_video_frame(obs, info['taken_action'], self.habitat_env.get_metrics())
         return obs, reward, done, info

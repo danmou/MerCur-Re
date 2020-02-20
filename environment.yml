@@ -29,12 +29,23 @@ dependencies:
   - imageio=2.4.1
   - imageio-ffmpeg
   - numba
-  - pillow
+  - pillow=6.*
   - pyglet
   - pytorch-gpu  # https://github.com/facebookresearch/habitat-sim/pull/469
   - quaternion  # (numpy-quaternion)
   - requests
   - yacs
+
+  # habitat_baselines PPO dependencies
+  - pytorch-gpu
+
+  # habitat_baselines SLAM dependencies
+#  - boost<1.70
+#  - cmake
+#  - eigen=3.3.5
+#  - glew=2.1.0
+#  - libxkbcommon
+#  - opencv=3.*
 
   # pip dependencies
   - pip

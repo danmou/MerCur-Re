@@ -12,7 +12,7 @@ import tensorflow as tf
 import wandb
 from loguru import logger
 
-from project.agents import Agent, ConstantAgent, ModelBasedAgent, MPCAgent, RandomAgent
+from project.agents import Agent, ConstantAgent, ModelBasedAgent, MPCAgent, RandomAgent, SLAMAgent
 from project.model import Model, restore_model
 from project.tasks import Task
 from project.util.tf import get_distribution_strategy
@@ -98,6 +98,8 @@ class Evaluator:
                 return RandomAgent(action_space)
             elif baseline == 'straight':
                 return ConstantAgent(action_space, value=tf.constant([0.0]))
+            elif baseline == 'slam':
+                return SLAMAgent(action_space)
             else:
                 raise RuntimeError(f'Unknown baseline {baseline}')
 
