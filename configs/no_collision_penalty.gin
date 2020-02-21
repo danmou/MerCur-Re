@@ -1,0 +1,2 @@
+collision_penalty.scaling = 0.0
+obstacle_distance_penalty.scaling = 0.0
