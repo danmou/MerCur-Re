@@ -91,8 +91,8 @@ class Simulator:
         log_fn = logger.info if log else logger.trace
         log_fn(f'Simulating {num_episodes} episodes closed-loop.')
         statistics_file = save_path / 'eval.csv' if log and save_path else None
-        statistics = Statistics(['steps', 'score', 'plan_time'] + self._metrics, save_file=statistics_file)
-        pp = PrettyPrinter(['episode', 'steps', 'score', 'plan_time'] + self._metrics, log_fn=log_fn)
+        statistics = Statistics(['steps', 'score', 'plan_time', 'obs_time'] + self._metrics, save_file=statistics_file)
+        pp = PrettyPrinter(['episode', 'steps', 'score', 'plan_time', 'obs_time'] + self._metrics, log_fn=log_fn)
         pp.print_header()
         for episode in range(num_episodes):
             steps, score, metrics = self.run_episode(env, agent, count)
@@ -116,12 +116,15 @@ class Simulator:
         done = tf.constant(False)
         score = tf.constant(0.0, tf.float32)
         steps = tf.constant(0, tf.int16)
+        obs_time = tf.constant(0.0, tf.float32)
         plan_time = tf.constant(0.0, tf.float32)
         metrics: Dict[str, tf.Tensor] = {}
 
         agent.reset()
         obs = self._tf_reset_env(env)
-        agent.observe(obs, action=None)
+        with Timer() as t:
+            agent.observe(obs, action=None)
+        obs_time += t.interval
         while not done:
             with Timer() as t:
                 action = agent.act()
@@ -131,6 +134,7 @@ class Simulator:
             steps += 1
             agent.observe(obs, action)
 
+        metrics['obs_time'] = obs_time / tf.cast(steps, tf.float32)
         metrics['plan_time'] = plan_time / tf.cast(steps, tf.float32)
         return steps, score, metrics
 
