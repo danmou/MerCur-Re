@@ -473,12 +473,15 @@ class PPOTrainer(BaseRLTrainer):
 
         self.actor_critic.eval()
 
+        plan_time = 0
+        steps = 0
         while (
             len(stats_episodes) < self.config.TEST_EPISODE_COUNT
             and self.envs.num_envs > 0
         ):
             current_episodes = self.envs.current_episodes()
 
+            t0 = time.time()
             with torch.no_grad():
                 (
                     _,
@@ -494,6 +497,9 @@ class PPOTrainer(BaseRLTrainer):
                 )
 
                 prev_actions.copy_(actions)
+
+            plan_time += time.time() - t0
+            steps += 1
 
             # outputs = self.envs.step([a[0].item() for a in actions])
             outputs = self.envs.step(data=[{'action': a[0].item()} for a in actions])
@@ -586,6 +592,7 @@ class PPOTrainer(BaseRLTrainer):
         mean_stats = dict()
         for stat_key in next(iter(stats_episodes.values())).keys():
             mean_stats[stat_key] = sum([v[stat_key] for v in stats_episodes.values()]) / num_episodes
+        mean_stats['plan_time'] = plan_time / steps
 
         for name, val in mean_stats.items():
             logger.info(f"Average episode {name}: {val:.6f}")
