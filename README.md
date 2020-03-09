@@ -1,4 +1,14 @@
-# Biologically Inspired Navigation for Embodied AI
+# Model-based Reinforcement Learning for PointGoal Navigation in Habitat
+
+Daniel Mouritzen
+
+[Presentation slides](https://danmou.github.io/presentation.html)
+
+This repository contains the source code for my master's thesis at the [Robotics and Perception Group](http://rpg.ifi.uzh.ch).
+The final model, called MerCur-Re (Drea**mer** with **Cur**riculum and **Re**training), is based on
+[Dreamer](https://github.com/google-research/dreamer/) by Danijar Hafner and achieves more than 70% success rate in the
+Gibson validation scenes after only 1M interactions with the test scenes, given only sparse rewards and monocular RGB input.
+See the slides for more results.
 
 ### Installation
 #### Development
